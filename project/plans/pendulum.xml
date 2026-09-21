@@ -1,9 +1,9 @@
 <mujoco model="pendulum">
   <option timestep="0.005" gravity="0 0 -9.81"/>
   <worldbody>
-    <body name="arm" pos="0 0 1">
-      <joint name="hinge" type="hinge" axis="0 1 0" pos="0 0 0"/>
-      <geom name="rod" type="capsule" fromto="0 0 0 0 0 -0.5" size="0.02" density="1000"/>
-    </body>
+	<body name="arm" pos="0 0 1">
+	  <joint name="hinge" type="hinge" axis="0 1 0" pos="0 0 0"/>
+	  <geom name="rod" type="capsule" fromto="0 0 0 0 0 -0.5" size="0.02" density="1000"/>
+	</body>
   </worldbody>
 </mujoco>
