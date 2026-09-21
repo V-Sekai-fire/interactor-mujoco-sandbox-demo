@@ -1,0 +1,18 @@
+[workspace]
+name = "riscv64-sysroot"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-arm64"]
+
+# clang is multi-target, so the cross compiler is just clang plus this sysroot.
+# lld does the linking: GNU ld would need a riscv64 build, lld does not.
+[dependencies]
+clang = ">=20"
+clangxx = ">=20"
+lld = ">=20"
+python = ">=3.11"
+
+[tasks]
+verify = "python assemble.py --verify"
+self-test = "python assemble.py --self-test"
+assemble = "python assemble.py --assemble"
+smoke = { cmd = "python smoke.py" }

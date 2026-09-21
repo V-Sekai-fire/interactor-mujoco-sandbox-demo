@@ -1,0 +1,7 @@
+# The sysroot is binaries and headers taken verbatim from Debian packages.
+# Any eol conversion corrupts an archive or a shared object, so nothing here
+# is text as far as git is concerned.
+sysroot/** -text -diff
+
+# Except the one file we rewrite, which is a linker script.
+sysroot/lib/libc.so text eol=lf

@@ -1,0 +1,16 @@
+# The riscv64-linux-gnu sysroot, by pinned Debian package.
+#
+# Fetched and verified rather than vendored: glibc is LGPL and libstdc++ is
+# GPL-3 with the runtime exception, so committing the binaries here would be
+# redistribution and would carry a source-offer obligation. A pin plus a hash
+# reproduces the same bytes without taking that on.
+#
+# Format: <package> <version> <sha256> <size> <path under deb.debian.org/debian/>
+
+linux-libc-dev-riscv64-cross 6.12.38-1cross1 e8683a94aad15e044efdd862e6da7e417e80747a6636bd8d19011dc220b9e825 2440048 pool/main/c/cross-toolchain-base/linux-libc-dev-riscv64-cross_6.12.38-1cross1_all.deb
+libc6-dev-riscv64-cross 2.41-11cross1 b76e06ca31dba05b94f0b648c4896c0e74bf6c50dc35a2fe4328fd7971dc802f 3121272 pool/main/c/cross-toolchain-base/libc6-dev-riscv64-cross_2.41-11cross1_all.deb
+libc6-riscv64-cross 2.41-11cross1 d91109b719920cb503ec5146abd2cc4ba838da5bac4c8c84f698b86b779613eb 1170268 pool/main/c/cross-toolchain-base/libc6-riscv64-cross_2.41-11cross1_all.deb
+libgcc-14-dev-riscv64-cross 14.2.0-19cross1 f7e759ee96231bc83e98c0f5a7a70460cabf08399a1eac23ab17f08288ff4b17 5177540 pool/main/g/gcc-14-cross/libgcc-14-dev-riscv64-cross_14.2.0-19cross1_all.deb
+libgcc-s1-riscv64-cross 14.2.0-19cross1 873ce7e703da35fff92aefc4b27661909529200000c2f3ee892f1aa06e072e3a 56764 pool/main/g/gcc-14-cross/libgcc-s1-riscv64-cross_14.2.0-19cross1_all.deb
+libstdc++-14-dev-riscv64-cross 14.2.0-19cross1 20f2ef235ba797f0b8cb26efb4cd68ca542f07d99e48aa4c83728122e750a92e 4939728 pool/main/g/gcc-14-cross/libstdc++-14-dev-riscv64-cross_14.2.0-19cross1_all.deb
+libstdc++6-riscv64-cross 14.2.0-19cross1 adbe5405e1e99baa964b3d0a4f8cc1d091f484e4089243e1b9dd00d0c03aa31a 660052 pool/main/g/gcc-14-cross/libstdc++6-riscv64-cross_14.2.0-19cross1_all.deb
