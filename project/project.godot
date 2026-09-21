@@ -21,3 +21,7 @@ config/features=PackedStringArray("4.7")
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot_sandbox/plugin.cfg", "res://addons/vsekai_godot_mcp/plugin.cfg")
+
+[sandbox]
+
+toolchain/skip_dependency_check=true
