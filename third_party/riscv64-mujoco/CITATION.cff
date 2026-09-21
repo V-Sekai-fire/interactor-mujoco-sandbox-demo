@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: If you use this package, cite MuJoCo.
+title: MuJoCo prebuilt for riscv64-linux-gnu
+abstract: >-
+  MuJoCo 3.14.0 cross-compiled to riscv64-linux-gnu as static archives, so a
+  RISC-V sandbox guest can link against it without a cross-toolchain or a
+  container. Unmodified sources; only the build configuration differs.
+type: software
+authors:
+  - name: DeepMind Technologies Limited
+    website: https://github.com/google-deepmind/mujoco
+url: https://github.com/google-deepmind/mujoco
+license: Apache-2.0
+version: 3.14.0

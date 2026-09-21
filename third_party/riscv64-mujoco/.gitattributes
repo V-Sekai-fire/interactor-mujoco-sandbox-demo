@@ -1,0 +1,3 @@
+# Archives and headers taken from a cross-build; eol conversion corrupts an .a.
+lib/** -text -diff
+include/** -text
