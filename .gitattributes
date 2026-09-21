@@ -1,0 +1,3 @@
+# Guest ELFs and the addon's native libraries; eol conversion corrupts them.
+project/plans/** -text -diff
+project/addons/godot_sandbox/bin/** -text -diff
