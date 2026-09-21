@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: If you use this sysroot, cite the Debian packages it was assembled from.
+title: riscv64-linux-gnu sysroot
+abstract: >-
+  Headers and libraries for the riscv64-linux-gnu target, assembled from
+  sha256-pinned Debian cross packages so that clang on any host can build and
+  link RISC-V Linux binaries. Redistributed unmodified apart from rewriting the
+  absolute paths in libc.so's linker script to be sysroot-relative.
+type: dataset
+authors:
+  - name: The Debian Project
+    website: https://www.debian.org/
+url: https://deb.debian.org/debian/
+repository: https://packages.debian.org/stable/
+license:
+  - LGPL-2.1-or-later
+  - GPL-3.0-with-GCC-exception
