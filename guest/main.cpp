@@ -49,10 +49,11 @@ static Variant mjc_load(Variant bytes) {
 // goes into MuJoCo's virtual filesystem and is parsed from there; this is what
 // makes a model loadable without precompiling an MJB on the host.
 static Variant mjc_load_xml(Variant text) {
-	std::string xml = text.as_std_string();
-	if (xml.empty()) {
+	const std::vector<uint8_t> v = text.as_byte_array().fetch();
+	if (v.empty()) {
 		return false;
 	}
+	const std::string xml(v.begin(), v.end());
 
 	if (g_data != nullptr) {
 		mj_deleteData(g_data);
@@ -75,7 +76,7 @@ static Variant mjc_load_xml(Variant text) {
 	g_model = mj_loadXML(name, &vfs, err, (int)sizeof(err));
 	mj_deleteVFS(&vfs);
 	if (g_model == nullptr) {
-		print("mj_loadXML failed: ", err);
+		print("mj_loadXML failed"); print(err);
 		return false;
 	}
 	g_data = mj_makeData(g_model);
@@ -114,7 +115,7 @@ static Variant mjc_qpos() {
 int main() {
 	ADD_API_FUNCTION(mjc_version, "int", "", "MuJoCo library version");
 	ADD_API_FUNCTION(mjc_load, "bool", "PackedByteArray mjb", "Load an MJB model from memory");
-	ADD_API_FUNCTION(mjc_load_xml, "bool", "String xml", "Load an MJCF model from XML text");
+	ADD_API_FUNCTION(mjc_load_xml, "bool", "PackedByteArray xml", "Load an MJCF model from XML text");
 	ADD_API_FUNCTION(mjc_step, "float", "", "Advance one step, returning simulated time");
 	ADD_API_FUNCTION(mjc_nq, "int", "", "Number of generalised coordinates");
 	ADD_API_FUNCTION(mjc_qpos, "Array", "", "Generalised positions");

@@ -36,9 +36,7 @@ Needs the two placed packages and clang — no cross-toolchain, no Docker:
 
 ## Where it stops, as of this commit
 
-`mjc_load_xml` **faults**. The XML crosses from GDScript and reaches the guest —
-`model xml bytes: 317` prints — then MuJoCo's model compiler takes a protection
-fault inside the sandbox:
+`mjc_load_xml` **faults**, and MuJoCo is not what faults:
 
     Exception: Protection fault (data: 0)
     -> _ZL12mjc_load_xml7Variant
@@ -47,10 +45,29 @@ Everything either side of it works: the guest loads, reports `MuJoCo version:
 3014000` from inside the emulator, and exposes its six bindings. Stepping
 without a model correctly returns `-1.0`.
 
-Two candidates, neither confirmed. The model compiler allocates far more than a
-stepping loop and may be hitting the guest's allocation ceiling rather than a
-genuine fault. Or `mjVFS` is a large stack object and the guest stack is 2 MB.
-The next step is to raise the guest's limits and see which moves.
+The fault reproduces in a guest with no MuJoCo and no static glibc
+(`minstep.elf`, four bindings and nothing else), which is what moves it off
+MuJoCo entirely. Three calls separate the failing path from the working one:
+
+| call | what it does | result |
+| --- | --- | --- |
+| `print_twice` | two guest→host prints, no transfer in | **passes** |
+| `fetch_silent` | `as_byte_array().fetch()`, no print after | **faults** |
+| `string_silent` | `as_std_string()`, no print after | **faults** |
+
+So guest→host works and **every host→guest Variant transfer faults**. Both
+failing paths end in `GuestStdVector::alloc`
+(`libriscv/guest/guest_cpp_vector.hpp:326-333`), which sets
+`ptr_begin = machine.arena().malloc(n)` and then takes `memarray<T>(ptr_begin, n)`.
+A malloc returning 0 makes that a read at address 0, which is the reported fault
+verbatim.
+
+The vendored addon is upstream's prebuilt binary — it carries none of the
+`save_state` symbols this workspace's fork adds — and it declares
+`compatibility_minimum = "4.4"` against the 4.7.2 that runs it, while the guest
+compiles against the fork's headers at `VERSION 11`. Host and guest are two
+trees. Building the extension from the fork so both come from one tree is the
+open step.
 
 An MJB compiled on the host and passed to `mjc_load` avoids the compiler
 entirely and is the other route; `mj_loadModel` takes a path and is unreachable

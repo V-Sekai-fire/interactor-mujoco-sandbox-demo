@@ -31,7 +31,7 @@ func _ready() -> void:
 		return
 	print("model xml bytes: ", xml.length())
 
-	if not _physics.vmcall("mjc_load_xml", xml):
+	if not _physics.vmcall("mjc_load_xml", xml.to_utf8_buffer()):
 		push_error("guest refused the model")
 		return
 	print("model loaded, nq = ", _physics.vmcall("mjc_nq"))
@@ -54,6 +54,12 @@ func _load_guest(path: String) -> Object:
 		push_error("Sandbox class not registered; is the addon enabled?")
 		return null
 	sb.set("program", load(path))
+	# The addon defaults to a 32 MB heap and 4000 allocations, sized for a script
+	# rather than a model compiler. Raised after load, because loading a program
+	# resets them.
+	sb.set_memory_max(512)
+	sb.set_allocations_max(1 << 20)
+	print("limits: memory_max=%d allocations_max=%d" % [sb.get_memory_max(), sb.get_allocations_max()])
 	return sb
 
 
