@@ -1,48 +1,36 @@
 extends Node
 
-## Drives a MuJoCo physics guest from GDScript.
+## Drives a cat's cradle MuJoCo guest from GDScript.
 ##
 ## The guest is a RISC-V ELF with MuJoCo linked into it, running in a Sandbox.
 ## The host owns the tick: every step happens because this script asked for one,
 ## which is what makes a run repeatable rather than racing a frame clock.
 ##
-## The model crosses as text, not a path. The guest has no filesystem, so the
-## XML goes into MuJoCo's virtual filesystem inside the guest and is parsed
-## there; nothing is precompiled on the host.
+## The model is compiled into the guest. A machine that can be serialised has
+## the flat arena off, and host-to-guest transfer allocates through that arena,
+## so a guest carrying its own model is the one that can also be migrated.
 
 const PHYSICS_ELF := "res://plans/mujoco.elf"
-const MODEL_XML := "res://plans/pendulum.xml"
-
-var _physics: Object = null
+const STEPS := 50
 
 
 func _ready() -> void:
-	_physics = _load_guest(PHYSICS_ELF)
-	if _physics == null:
-		push_error("MuJoCo guest did not load")
+	var sb := _load_guest(PHYSICS_ELF)
+	if sb == null:
 		return
 
-	print("guest functions: ", _physics.get_functions())
-	print("MuJoCo version: ", _physics.vmcall("mjc_version"))
+	print("MuJoCo version: ", sb.vmcall("mjc_version"))
+	print("minimal model builds: ", sb.vmcall("mjc_xml_selftest"))
 
-	var xml := FileAccess.get_file_as_string(MODEL_XML)
-	if xml.is_empty():
-		push_error("could not read " + MODEL_XML)
+	if not sb.vmcall("mjc_load_builtin"):
+		push_error("the guest could not build its model")
 		return
-	print("model xml bytes: ", xml.length())
 
-	if not _physics.vmcall("mjc_load_xml", xml.to_utf8_buffer()):
-		push_error("guest refused the model")
-		return
-	print("model loaded, nq = ", _physics.vmcall("mjc_nq"))
-
-	# A pendulum released off-centre must fall. Printing the angle each step is
-	# what shows the simulation actually advanced, rather than that a call
-	# returned without error.
-	print("qpos at rest: ", _physics.vmcall("mjc_qpos"))
-	for i in range(5):
-		var t = _physics.vmcall("mjc_step")
-		print("  t=%.3f  qpos=%s" % [t, str(_physics.vmcall("mjc_qpos"))])
+	print("nq=%d neq=%d" % [sb.vmcall("mjc_nq"), sb.vmcall("mjc_neq")])
+	print("lowest at rest: ", _mm(sb.vmcall("mjc_lowest_mm")))
+	for i in range(STEPS):
+		sb.vmcall("mjc_step")
+	print("after %d steps: ncon=%d lowest=%s" % [STEPS, sb.vmcall("mjc_ncon"), _mm(sb.vmcall("mjc_lowest_mm"))])
 
 
 func _load_guest(path: String) -> Object:
@@ -55,18 +43,24 @@ func _load_guest(path: String) -> Object:
 		return null
 	sb.set("program", load(path))
 	# The addon defaults to a 32 MB heap and 4000 allocations, sized for a script
-	# rather than a model compiler. Raised after load, because loading a program
-	# resets them.
+	# rather than a model compiler. Raised after load, because loading resets them.
 	sb.set_memory_max(512)
 	sb.set_allocations_max(1 << 20)
-	print("limits: memory_max=%d allocations_max=%d" % [sb.get_memory_max(), sb.get_allocations_max()])
 	return sb
 
 
-## Steps the simulation n times, returning the simulated time after each, so a
-## caller can see it advance rather than trusting that it did.
-func step_many(n: int) -> Array:
-	var times: Array = []
-	for i in range(n):
-		times.append(_physics.vmcall("mjc_step"))
-	return times
+## Millimetres paired with something a reader can picture, because "4.3 mm" does
+## not say whether an error matters.
+func _mm(v: float) -> String:
+	var anchors := {"a credit card": 0.76, "a penny": 1.52, "a pencil": 7.0,
+		"a AA battery": 14.5, "a nickel": 21.2, "a golf ball": 42.7,
+		"an adult wrist": 57.0, "a soda can": 66.0}
+	var best := ""
+	var best_err := INF
+	for name in anchors:
+		var n: float = abs(v) / float(anchors[name])
+		var err: float = abs(n - round(n))
+		if n >= 0.5 and err < best_err:
+			best_err = err
+			best = "%.1f x %s" % [n, name]
+	return "%.1f mm (%s)" % [v, best] if best != "" else "%.1f mm" % v
