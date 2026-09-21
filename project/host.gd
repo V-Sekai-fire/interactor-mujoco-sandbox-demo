@@ -6,11 +6,12 @@ extends Node
 ## The host owns the tick: every step happens because this script asked for one,
 ## which is what makes a run repeatable rather than racing a frame clock.
 ##
-## Two programs is the arrangement, not one: this demo loads the physics guest,
-## and a second Sandbox can load a .sgd guest holding the logic. They meet here
-## rather than being linked together, because GDScript cannot link a C library.
+## The model crosses as text, not a path. The guest has no filesystem, so the
+## XML goes into MuJoCo's virtual filesystem inside the guest and is parsed
+## there; nothing is precompiled on the host.
 
 const PHYSICS_ELF := "res://plans/mujoco.elf"
+const MODEL_XML := "res://plans/pendulum.xml"
 
 var _physics: Object = null
 
@@ -23,13 +24,25 @@ func _ready() -> void:
 
 	print("guest functions: ", _physics.get_functions())
 	print("MuJoCo version: ", _physics.vmcall("mjc_version"))
-	print("nq before a model is loaded: ", _physics.vmcall("mjc_nq"))
 
-	# Without a model, stepping must report that it did nothing rather than
-	# pretend it advanced. A demo that looks alive with no model is a demo that
-	# would look alive with a broken one.
-	var t = _physics.vmcall("mjc_step")
-	print("step with no model -> ", t, "  (negative means refused)")
+	var xml := FileAccess.get_file_as_string(MODEL_XML)
+	if xml.is_empty():
+		push_error("could not read " + MODEL_XML)
+		return
+	print("model xml bytes: ", xml.length())
+
+	if not _physics.vmcall("mjc_load_xml", xml):
+		push_error("guest refused the model")
+		return
+	print("model loaded, nq = ", _physics.vmcall("mjc_nq"))
+
+	# A pendulum released off-centre must fall. Printing the angle each step is
+	# what shows the simulation actually advanced, rather than that a call
+	# returned without error.
+	print("qpos at rest: ", _physics.vmcall("mjc_qpos"))
+	for i in range(5):
+		var t = _physics.vmcall("mjc_step")
+		print("  t=%.3f  qpos=%s" % [t, str(_physics.vmcall("mjc_qpos"))])
 
 
 func _load_guest(path: String) -> Object:
@@ -44,8 +57,8 @@ func _load_guest(path: String) -> Object:
 	return sb
 
 
-## Steps the simulation n times and returns the simulated time after each,
-## so a caller can see it advance rather than trusting that it did.
+## Steps the simulation n times, returning the simulated time after each, so a
+## caller can see it advance rather than trusting that it did.
 func step_many(n: int) -> Array:
 	var times: Array = []
 	for i in range(n):

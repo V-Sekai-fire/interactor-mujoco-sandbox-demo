@@ -7,5 +7,5 @@ add_sandbox_program(mjstep main.cpp)
 target_include_directories(mjstep PRIVATE "${MJ}/include")
 target_link_libraries(mjstep PRIVATE
 	"${MJ}/lib/libmujoco.a" "${MJ}/lib/libccd.a" "${MJ}/lib/libtinyxml2.a"
-	"${MJ}/lib/libqhullstatic_r.a" "${MJ}/lib/libtinyobjloader.a" "${MJ}/lib/libminiz.a"
+	"${MJ}/lib/libqhullstatic_r.a" "${MJ}/lib/libtinyobjloader.a" "${MJ}/lib/libminiz.a" "${MJ}/lib/liblodepng.a"
 	-lm -lstdc++)

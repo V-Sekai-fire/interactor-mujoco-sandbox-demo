@@ -45,6 +45,43 @@ static Variant mjc_load(Variant bytes) {
 	return g_data != nullptr;
 }
 
+// Load MJCF XML handed over as bytes. The guest has no filesystem, so the text
+// goes into MuJoCo's virtual filesystem and is parsed from there; this is what
+// makes a model loadable without precompiling an MJB on the host.
+static Variant mjc_load_xml(Variant text) {
+	std::string xml = text.as_std_string();
+	if (xml.empty()) {
+		return false;
+	}
+
+	if (g_data != nullptr) {
+		mj_deleteData(g_data);
+		g_data = nullptr;
+	}
+	if (g_model != nullptr) {
+		mj_deleteModel(g_model);
+		g_model = nullptr;
+	}
+
+	static mjVFS vfs;
+	mj_defaultVFS(&vfs);
+	const char *name = "model.xml";
+	if (mj_addBufferVFS(&vfs, name, xml.data(), (int)xml.size()) != 0) {
+		mj_deleteVFS(&vfs);
+		return false;
+	}
+
+	char err[512] = {0};
+	g_model = mj_loadXML(name, &vfs, err, (int)sizeof(err));
+	mj_deleteVFS(&vfs);
+	if (g_model == nullptr) {
+		print("mj_loadXML failed: ", err);
+		return false;
+	}
+	g_data = mj_makeData(g_model);
+	return g_data != nullptr;
+}
+
 // One step, returned as the simulated time so the host can see it advance.
 static Variant mjc_step() {
 	if (g_model == nullptr || g_data == nullptr) {
@@ -77,6 +114,7 @@ static Variant mjc_qpos() {
 int main() {
 	ADD_API_FUNCTION(mjc_version, "int", "", "MuJoCo library version");
 	ADD_API_FUNCTION(mjc_load, "bool", "PackedByteArray mjb", "Load an MJB model from memory");
+	ADD_API_FUNCTION(mjc_load_xml, "bool", "String xml", "Load an MJCF model from XML text");
 	ADD_API_FUNCTION(mjc_step, "float", "", "Advance one step, returning simulated time");
 	ADD_API_FUNCTION(mjc_nq, "int", "", "Number of generalised coordinates");
 	ADD_API_FUNCTION(mjc_qpos, "Array", "", "Generalised positions");

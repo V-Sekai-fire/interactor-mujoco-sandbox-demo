@@ -34,12 +34,27 @@ Needs the two placed packages and clang — no cross-toolchain, no Docker:
 `5-repository/riscv64-sysroot` supplies headers, startup files and glibc;
 `5-repository/riscv64-mujoco` supplies the physics archives.
 
-## What it does not do yet
+## Where it stops, as of this commit
 
-No model is loaded. The guest has no filesystem, so a model must be compiled to
-MJB on the host and passed to `mjc_load` as bytes — `mj_loadModel` takes a path
-and is unreachable from a guest, `mj_loadModelBuffer` is the one that works.
-Stepping without a model returns `-1.0` rather than appearing to run.
+`mjc_load_xml` **faults**. The XML crosses from GDScript and reaches the guest —
+`model xml bytes: 317` prints — then MuJoCo's model compiler takes a protection
+fault inside the sandbox:
+
+    Exception: Protection fault (data: 0)
+    -> _ZL12mjc_load_xml7Variant
+
+Everything either side of it works: the guest loads, reports `MuJoCo version:
+3014000` from inside the emulator, and exposes its six bindings. Stepping
+without a model correctly returns `-1.0`.
+
+Two candidates, neither confirmed. The model compiler allocates far more than a
+stepping loop and may be hitting the guest's allocation ceiling rather than a
+genuine fault. Or `mjVFS` is a large stack object and the guest stack is 2 MB.
+The next step is to raise the guest's limits and see which moves.
+
+An MJB compiled on the host and passed to `mjc_load` avoids the compiler
+entirely and is the other route; `mj_loadModel` takes a path and is unreachable
+from a guest, `mj_loadModelBuffer` is the one that works.
 
 The vendored addon prints `Object 'Sandbox' already has member ''` on load. It
 is upstream's prebuilt binary and the message is harmless here, but it points at
