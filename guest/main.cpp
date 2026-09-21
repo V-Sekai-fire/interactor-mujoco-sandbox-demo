@@ -106,66 +106,8 @@ static bool load_xml_text(const char *text, int len) {
 	return g_data != nullptr;
 }
 
-// tinyxml2 decides where an attribute starts by calling isspace. A statically
-// linked glibc guest that never ran libc startup has no ctype table, so this
-// reports what the parser is actually seeing.
-static Variant mjc_ctype_check() {
-	Array out = Array::Create();
-	out.push_back(isspace(32) ? 1 : 0);
-	out.push_back(isspace(9) ? 1 : 0);
-	out.push_back(isalpha(97) ? 1 : 0);
-	return out;
-}
 
-// The guest links with --wrap on strlen/strcmp/strncmp/memcmp. tinyxml2 finds
-// an attribute's closing quote with strncmp against a one-character tag, which
-// is the only place a parse of plain elements never reaches.
-static Variant mjc_str_check() {
-	Array out = Array::Create();
-	const char *q = "\"a\"";
-	const char endTag[2] = { '"', 0 };
-	out.push_back((int)strlen(endTag));
-	out.push_back(strncmp(q, endTag, 1) == 0 ? 1 : 0);
-	out.push_back(strncmp(q + 1, endTag, 1) != 0 ? 1 : 0);
-	out.push_back(strncmp(q + 2, endTag, 1) == 0 ? 1 : 0);
-	out.push_back(memcmp(q, endTag, 1) == 0 ? 1 : 0);
-	out.push_back(strcmp("ab", "ab") == 0 ? 1 : 0);
-	return out;
-}
 
-// Whether this build can construct an mjModel at all. The XML parses; the
-// library then reports its own buffer size mismatch, so the smallest possible
-// model is the shortest path to that failure.
-static Variant mjc_xml_selftest() {
-	// Raw literals, so what the parser sees is what is written here.
-	static const char *cases[] = {
-		R"XML(<mujoco/>)XML",
-		R"XML(<mujoco model="a"/>)XML",
-		R"XML(<mujoco><worldbody/></mujoco>)XML",
-		R"XML(<mujoco><worldbody><body pos="0 0 1"><geom type="sphere" size="0.1"/></body></worldbody></mujoco>)XML",
-	};
-	Array out = Array::Create();
-	for (int i = 0; i < 4; i++) {
-		static mjVFS vfs;
-		mj_defaultVFS(&vfs);
-		const int len = (int)strlen(cases[i]);
-		if (mj_addBufferVFS(&vfs, "m.xml", cases[i], len) != 0) {
-			mj_deleteVFS(&vfs);
-			out.push_back("vfs-failed");
-			continue;
-		}
-		char err[256] = { 0 };
-		mjModel *m = mj_loadXML("m.xml", &vfs, err, (int)sizeof(err));
-		mj_deleteVFS(&vfs);
-		if (m != nullptr) {
-			mj_deleteModel(m);
-			out.push_back("ok");
-		} else {
-			out.push_back(err);
-		}
-	}
-	return out;
-}
 
 // The model the guest ships with, needing nothing from the host.
 static Variant mjc_load_builtin() {
@@ -235,6 +177,36 @@ static Variant mjc_digest() {
 	return (int64_t)(h & 0x7FFFFFFFFFFFFFFFULL);
 }
 
+// Body count including the world body at index 0.
+static Variant mjc_nbody() {
+	return g_model == nullptr ? 0 : (int)g_model->nbody;
+}
+
+// Every body as x, y, z, qw, qx, qy, qz, so the host can draw the figure
+// without knowing anything about the model.
+static Variant mjc_bodies() {
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(std::vector<double>());
+	}
+	std::vector<double> out;
+	out.reserve((size_t)g_model->nbody * 7);
+	for (int i = 0; i < g_model->nbody; i++) {
+		out.push_back(g_data->xpos[i * 3 + 0]);
+		out.push_back(g_data->xpos[i * 3 + 1]);
+		out.push_back(g_data->xpos[i * 3 + 2]);
+		out.push_back(g_data->xquat[i * 4 + 0]);
+		out.push_back(g_data->xquat[i * 4 + 1]);
+		out.push_back(g_data->xquat[i * 4 + 2]);
+		out.push_back(g_data->xquat[i * 4 + 3]);
+	}
+	return PackedArray<double>(out);
+}
+
+// Simulated time, so a restored run can be shown resuming rather than restarting.
+static Variant mjc_time() {
+	return g_data == nullptr ? 0.0 : (double)g_data->time;
+}
+
 // Lowest point of the figure, in millimetres. Sag is what shows the cradle is
 // held rather than fallen.
 static Variant mjc_lowest_mm() {
@@ -258,9 +230,6 @@ int main() {
 	mju_user_malloc = aligned64_malloc;
 	mju_user_free = aligned64_free;
 
-	ADD_API_FUNCTION(mjc_str_check, "Array", "", "wrapped string functions as the guest sees them");
-	ADD_API_FUNCTION(mjc_ctype_check, "Array", "", "isspace/isalpha as the guest sees them");
-	ADD_API_FUNCTION(mjc_xml_selftest, "Array", "", "Whether a minimal model can be built");
 	ADD_API_FUNCTION(mjc_version, "int", "", "MuJoCo library version");
 	ADD_API_FUNCTION(mjc_load, "bool", "PackedByteArray mjb", "Load an MJB model from memory");
 	ADD_API_FUNCTION(mjc_load_builtin, "bool", "", "Load the model compiled into this guest");
@@ -269,6 +238,9 @@ int main() {
 	ADD_API_FUNCTION(mjc_nq, "int", "", "Number of generalised coordinates");
 	ADD_API_FUNCTION(mjc_neq, "int", "", "Number of equality constraints");
 	ADD_API_FUNCTION(mjc_ncon, "int", "", "Active contacts this step");
+	ADD_API_FUNCTION(mjc_nbody, "int", "", "Number of bodies");
+	ADD_API_FUNCTION(mjc_bodies, "PackedFloat64Array", "", "Body transforms as x,y,z,qw,qx,qy,qz");
+	ADD_API_FUNCTION(mjc_time, "float", "", "Simulated time");
 	ADD_API_FUNCTION(mjc_qpos, "PackedFloat64Array", "", "Generalised positions");
 	ADD_API_FUNCTION(mjc_digest, "int", "", "Digest of the full integration state");
 	ADD_API_FUNCTION(mjc_lowest_mm, "float", "", "Lowest body height in millimetres");

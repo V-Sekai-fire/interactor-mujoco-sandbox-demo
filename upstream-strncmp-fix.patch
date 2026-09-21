@@ -1,0 +1,48 @@
+From 5a75ba0fa025dd86b983127eb7ff2f809d43f164 Mon Sep 17 00:00:00 2001
+From: "K. S. Ernest (iFire) Lee" <ernest.lee@chibifire.com>
+Date: Mon, 21 Sep 2026 16:16:08 -0700
+Subject: [PATCH] Stop __wrap_strncmp overwriting the length it was given
+
+CREATE_SYSCALL_STRCMP emits "li a2, 4096" before the ecall. For strcmp that
+is a safety cap and correct. strncmp receives its length in a2, so the same
+macro discards it and every call compares to the first difference or the NUL
+instead of stopping at n.
+
+The unwrapped strncmp on line 68 already uses CREATE_SYSCALL, which leaves a2
+alone, so the two spellings of the same function in this file disagreed.
+
+Measured in a guest, through a volatile function pointer so the call is not
+inlined and constant-folded:
+
+    strncmp("\"/>", "\"", 1)          returns 47, expected 0
+    strncmp("abcXXXX", "abcYYYY", 3)  returns -1, expected 0
+
+47 is '/', the byte at index 1, one past the length requested.
+
+What this breaks downstream is any in-place parser that matches a short
+delimiter inside a longer buffer. tinyxml2 finds an attribute's closing quote
+with strncmp against a one-character tag, so no XML attribute parses in a
+guest at all: <a/> loads and <a b="c"/> does not. That is enough to stop every
+MJCF model from loading.
+---
+ program/cpp/docker/api/native.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/program/cpp/docker/api/native.cpp b/program/cpp/docker/api/native.cpp
+index 6276ded..94f34cc 100644
+--- a/program/cpp/docker/api/native.cpp
++++ b/program/cpp/docker/api/native.cpp
+@@ -97,7 +97,9 @@ CREATE_SYSCALL(__wrap_memmove, SYSCALL_MEMMOVE);
+ CREATE_SYSCALL(__wrap_memcmp, SYSCALL_MEMCMP);
+ CREATE_SYSCALL(__wrap_strlen, SYSCALL_STRLEN);
+ CREATE_SYSCALL_STRCMP(__wrap_strcmp, SYSCALL_STRCMP);
+-CREATE_SYSCALL_STRCMP(__wrap_strncmp, SYSCALL_STRCMP);
++// strncmp receives its length in a2; CREATE_SYSCALL_STRCMP overwrites a2 with
++// a fixed cap, which is right for strcmp and makes strncmp compare past n.
++CREATE_SYSCALL(__wrap_strncmp, SYSCALL_STRCMP);
+ 
+ extern "C" void *__wrap_malloc(size_t size);
+ extern "C" void __wrap_free(void *ptr);
+-- 
+2.55.0.windows.3
+
