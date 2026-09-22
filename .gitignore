@@ -4,6 +4,7 @@ __pycache__/
 build/
 tests/guest/build/
 model/.lake/
+.lake/
 media/
 /project/addons/godot_sandbox/bin/~libgodot_riscv.windows.template_release.x86_64.dll
 project/plans/names.elf
