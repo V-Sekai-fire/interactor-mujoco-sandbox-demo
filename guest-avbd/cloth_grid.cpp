@@ -138,11 +138,10 @@ ClothMesh build_cloth_mesh(uint32_t nx, uint32_t ny, float width, float height,
 		m.bendNTarget.push_back(float(norm(s)));
 	}
 
-	// Pin the two far corners (iy = ny-1) as AL attachments at rest, so the
-	// panel sags into a hammock between them under gravity — the classic
-	// two-corner cloth drape.
-	const uint32_t corners[2] = { vid(0, ny - 1), vid(nx - 1, ny - 1) };
-	for (uint32_t v : corners) {
+	// Pin the whole far edge (iy = ny-1) so the panel hangs from it like a
+	// curtain and swings down under gravity.
+	for (uint32_t ix = 0; ix < nx; ++ix) {
+		const uint32_t v = vid(ix, ny - 1);
 		m.attachVert.push_back(v);
 		m.attachFixed.push_back(m.positions[3 * v + 0]);
 		m.attachFixed.push_back(m.positions[3 * v + 1]);

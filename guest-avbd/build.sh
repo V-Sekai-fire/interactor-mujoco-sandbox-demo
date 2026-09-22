@@ -6,10 +6,12 @@
 #
 #   ./build.sh              # regenerate kernels, run native tests, build the ELF
 #   ./build.sh --no-emit    # skip Lean/slangc, use the committed gen/ emits
+#   ./build.sh --no-tests   # skip the native test suites (build the ELF only)
 #
-# Tools are taken from PATH: clang++ (with a riscv64 target), ninja, cmake, and
-# for a full run lake + slangc. Point AVBD_DEMO_REPO at the cloth demo checkout
-# to install the ELF into it; otherwise the install step is skipped.
+# Tools are taken from PATH: a riscv64-capable clang++ (auto-located if the bare
+# clang++ is mingw-only), cmake, and either ninja or make. A full run also needs
+# lake + slangc. Point AVBD_DEMO_REPO at the cloth demo checkout to install the
+# ELF into it; otherwise the install step is skipped.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,17 +20,49 @@ CLOTH="$(cd "$HERE/../../cloth-dynamics" && pwd)"
 SLANG_RT="$HERE/slang-rt"
 DEMO_REPO="${AVBD_DEMO_REPO:-}"
 
+NO_EMIT=0
+NO_TESTS=0
+for a in "$@"; do
+	case "$a" in
+		--no-emit) NO_EMIT=1 ;;
+		--no-tests) NO_TESTS=1 ;;
+		*) echo "unknown option: $a" >&2; exit 2 ;;
+	esac
+done
+
 need() {
 	if ! command -v "$1" >/dev/null 2>&1; then
 		echo "error: '$1' is not on PATH" >&2
 		exit 1
 	fi
 }
-need clang++
 need cmake
-need ninja
-if ! clang++ --print-targets 2>/dev/null | grep -qi riscv64; then
-	echo "error: the clang++ on PATH has no riscv64 target (a mingw-only clang will not do)" >&2
+
+# The toolchain file and the native tests both invoke a bare `clang++`, so a
+# riscv64-capable one must resolve first on PATH. If the bare clang++ is a
+# mingw build with no riscv64 target, put a capable one ahead of it.
+has_riscv() { "$1" --print-targets 2>/dev/null | grep -qi riscv64; }
+if ! { command -v clang++ >/dev/null 2>&1 && has_riscv clang++; }; then
+	FOUND=""
+	for c in "$HOME/scoop/apps/llvm/current/bin/clang++" "/c/Program Files/LLVM/bin/clang++"; do
+		if [ -x "$c" ] && has_riscv "$c"; then FOUND="$c"; break; fi
+	done
+	if [ -z "$FOUND" ]; then
+		echo "error: no clang++ with a riscv64 target found (a mingw-only clang will not do)" >&2
+		exit 1
+	fi
+	export PATH="$(dirname "$FOUND"):$PATH"
+fi
+
+# Prefer ninja; fall back to make so the build does not hard-require ninja.
+if command -v ninja >/dev/null 2>&1; then
+	GEN=(-G Ninja -DCMAKE_MAKE_PROGRAM="$(command -v ninja)")
+elif command -v make >/dev/null 2>&1; then
+	GEN=(-G "Unix Makefiles" -DCMAKE_MAKE_PROGRAM="$(command -v make)")
+elif command -v mingw32-make >/dev/null 2>&1; then
+	GEN=(-G "Unix Makefiles" -DCMAKE_MAKE_PROGRAM="$(command -v mingw32-make)")
+else
+	echo "error: need ninja or make on PATH" >&2
 	exit 1
 fi
 
@@ -38,7 +72,7 @@ KERNELS="vbd_init spring_force vbd_gather_spring attachment_force_al \
   triangle_bending_force_al vbd_gather_bending vbd_solve_apply \
   attachment_dual_update triangle_membrane_dual_update triangle_bending_dual_update"
 
-if [ "${1:-}" != "--no-emit" ]; then
+if [ "$NO_EMIT" = 0 ]; then
 	echo "== emitting Slang kernels from Lean =="
 	need lake
 	need slangc
@@ -50,21 +84,20 @@ if [ "${1:-}" != "--no-emit" ]; then
 	done
 fi
 
-echo "== native tests =="
-mkdir -p "$HERE/build"
-for t in oracle drape parallel_islands split_panel; do
-	clang++ -std=c++17 -O2 -pthread -Wno-unused-parameter \
-		-I "$HERE/gen" -I "$SLANG_RT" \
-		"$HERE/avbd_cpu.cpp" "$HERE/cloth_grid.cpp" "$HERE/tests/$t.cpp" \
-		-o "$HERE/build/$t.exe"
-	"$HERE/build/$t.exe"
-done
+if [ "$NO_TESTS" = 0 ]; then
+	echo "== native tests =="
+	mkdir -p "$HERE/build"
+	for t in oracle drape parallel_islands split_panel; do
+		clang++ -std=c++17 -O2 -pthread -Wno-unused-parameter \
+			-I "$HERE/gen" -I "$SLANG_RT" \
+			"$HERE/avbd_cpu.cpp" "$HERE/cloth_grid.cpp" "$HERE/tests/$t.cpp" \
+			-o "$HERE/build/$t.exe"
+		"$HERE/build/$t.exe"
+	done
+fi
 
 echo "== cross-compiling the guest ELF =="
-# The toolchain file selects a bare `clang++`, so the riscv64-capable one must
-# be first on PATH; the guard above checks that.
-cmake -S "$HERE" -B "$HERE/build/guest" -G Ninja \
-	-DCMAKE_MAKE_PROGRAM="$(command -v ninja)" \
+cmake -S "$HERE" -B "$HERE/build/guest" "${GEN[@]}" \
 	-DCMAKE_TOOLCHAIN_FILE="$DEMO_ROOT/third_party/riscv64-sysroot/toolchain.cmake"
 cmake --build "$HERE/build/guest"
 

@@ -15,7 +15,8 @@ static Variant avbd_load(int nx, int ny) {
 		return false;
 	}
 	g_sim = ClothSim();
-	g_sim.setup(build_cloth_mesh(uint32_t(nx), uint32_t(ny), 0.5f, 0.7f, 1.2f, 0.05f));
+	g_sim.setup(build_cloth_mesh(uint32_t(nx), uint32_t(ny), 0.5f, 0.7f, 1.2f, 0.3f));
+	g_sim.damp = 0.98f;
 	g_ready = true;
 	return true;
 }
@@ -100,6 +101,36 @@ static Variant avbd_release() {
 	return true;
 }
 
+static Variant avbd_bar(float x, float y, float z) {
+	if (!g_ready) {
+		return false;
+	}
+	g_sim.moveBar(x, y, z);
+	return true;
+}
+
+static Variant avbd_snapshot() {
+	if (!g_ready) {
+		return false;
+	}
+	g_sim.snapshot();
+	return true;
+}
+
+static Variant avbd_restore() {
+	if (!g_ready) {
+		return false;
+	}
+	return g_sim.restore();
+}
+
+static Variant avbd_finite() {
+	if (!g_ready) {
+		return true;
+	}
+	return g_sim.finite();
+}
+
 int main() {
 	ADD_API_FUNCTION(avbd_load, "bool", "int nx, int ny", "Build an nx-by-ny cloth panel and set up AVBD");
 	ADD_API_FUNCTION(avbd_step, "bool", "int substeps", "Advance the AVBD solve by N substeps");
@@ -111,5 +142,9 @@ int main() {
 	ADD_API_FUNCTION(avbd_grab, "bool", "int v", "Pin vertex v to a drag anchor at its current position");
 	ADD_API_FUNCTION(avbd_drag, "bool", "float x, float y, float z", "Move the grabbed anchor to x,y,z");
 	ADD_API_FUNCTION(avbd_release, "bool", "", "Release the grabbed vertex and restore the pins");
+	ADD_API_FUNCTION(avbd_bar, "bool", "float x, float y, float z", "Offset the whole pinned edge (the flag bar) from rest");
+	ADD_API_FUNCTION(avbd_snapshot, "bool", "", "Save the current solvable state");
+	ADD_API_FUNCTION(avbd_restore, "bool", "", "Restore the last saved state (IK closest-place fallback)");
+	ADD_API_FUNCTION(avbd_finite, "bool", "", "Whether the current state is finite (not blown up)");
 	halt();
 }
