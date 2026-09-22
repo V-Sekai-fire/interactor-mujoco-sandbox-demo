@@ -1,188 +1,188 @@
 <mujoco model="cats_cradle">
   <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
   <default>
-    <geom type="capsule" size="0.003" density="1200" friction="0.6 0.005 0.0001" condim="3"/>
+	<geom type="capsule" size="0.003" density="1200" friction="0.6 0.005 0.0001" condim="3"/>
   </default>
   <worldbody>
-    <site name="left_thumb" pos="-0.15000 -0.05000 0.30000" size="0.006"/>
-    <site name="right_index" pos="0.15000 0.05000 0.30000" size="0.006"/>
-    <site name="right_thumb" pos="0.15000 -0.05000 0.30000" size="0.006"/>
-    <site name="left_index" pos="-0.15000 0.05000 0.30000" size="0.006"/>
-    <body name="seg0" pos="-0.13356 -0.04452 0.29868">
-      <freejoint/>
-      <geom name="g0" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg1" pos="-0.10068 -0.03356 0.29605">
-      <freejoint/>
-      <geom name="g1" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg2" pos="-0.06779 -0.02260 0.29342">
-      <freejoint/>
-      <geom name="g2" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg3" pos="-0.03491 -0.01164 0.29079">
-      <freejoint/>
-      <geom name="g3" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg4" pos="-0.00203 -0.00068 0.28932">
-      <freejoint/>
-      <geom name="g4" fromto="-0.01644 -0.00548 0.00016 0.01644 0.00548 -0.00016"/>
-    </body>
-    <body name="seg5" pos="0.03086 0.01029 0.29047">
-      <freejoint/>
-      <geom name="g5" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg6" pos="0.06374 0.02125 0.29310">
-      <freejoint/>
-      <geom name="g6" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg7" pos="0.09662 0.03221 0.29573">
-      <freejoint/>
-      <geom name="g7" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg8" pos="0.12951 0.04317 0.29836">
-      <freejoint/>
-      <geom name="g8" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg9" pos="0.14797 0.03409 0.29984">
-      <freejoint/>
-      <geom name="g9" fromto="-0.00203 0.01456 -0.00016 0.00203 -0.01456 0.00016"/>
-    </body>
-    <body name="seg10" pos="0.15000 0.00214 0.30000">
-      <freejoint/>
-      <geom name="g10" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
-    </body>
-    <body name="seg11" pos="0.15000 -0.03262 0.30000">
-      <freejoint/>
-      <geom name="g11" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
-    </body>
-    <body name="seg12" pos="0.13356 -0.04452 0.30132">
-      <freejoint/>
-      <geom name="g12" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg13" pos="0.10068 -0.03356 0.30395">
-      <freejoint/>
-      <geom name="g13" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg14" pos="0.06779 -0.02260 0.30658">
-      <freejoint/>
-      <geom name="g14" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg15" pos="0.03491 -0.01164 0.30921">
-      <freejoint/>
-      <geom name="g15" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
-    </body>
-    <body name="seg16" pos="0.00203 -0.00068 0.31068">
-      <freejoint/>
-      <geom name="g16" fromto="0.01644 -0.00548 -0.00016 -0.01644 0.00548 0.00016"/>
-    </body>
-    <body name="seg17" pos="-0.03086 0.01029 0.30953">
-      <freejoint/>
-      <geom name="g17" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg18" pos="-0.06374 0.02125 0.30690">
-      <freejoint/>
-      <geom name="g18" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg19" pos="-0.09662 0.03221 0.30427">
-      <freejoint/>
-      <geom name="g19" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg20" pos="-0.12951 0.04317 0.30164">
-      <freejoint/>
-      <geom name="g20" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
-    </body>
-    <body name="seg21" pos="-0.14797 0.03409 0.30016">
-      <freejoint/>
-      <geom name="g21" fromto="0.00203 0.01456 0.00016 -0.00203 -0.01456 -0.00016"/>
-    </body>
-    <body name="seg22" pos="-0.15000 0.00214 0.30000">
-      <freejoint/>
-      <geom name="g22" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
-    </body>
-    <body name="seg23" pos="-0.15000 -0.03262 0.30000">
-      <freejoint/>
-      <geom name="g23" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
-    </body>
+	<site name="left_thumb" pos="-0.15000 -0.05000 0.30000" size="0.006"/>
+	<site name="right_index" pos="0.15000 0.05000 0.30000" size="0.006"/>
+	<site name="right_thumb" pos="0.15000 -0.05000 0.30000" size="0.006"/>
+	<site name="left_index" pos="-0.15000 0.05000 0.30000" size="0.006"/>
+	<body name="seg0" pos="-0.13356 -0.04452 0.29868">
+	  <freejoint/>
+	  <geom name="g0" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg1" pos="-0.10068 -0.03356 0.29605">
+	  <freejoint/>
+	  <geom name="g1" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg2" pos="-0.06779 -0.02260 0.29342">
+	  <freejoint/>
+	  <geom name="g2" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg3" pos="-0.03491 -0.01164 0.29079">
+	  <freejoint/>
+	  <geom name="g3" fromto="-0.01644 -0.00548 0.00132 0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg4" pos="-0.00203 -0.00068 0.28932">
+	  <freejoint/>
+	  <geom name="g4" fromto="-0.01644 -0.00548 0.00016 0.01644 0.00548 -0.00016"/>
+	</body>
+	<body name="seg5" pos="0.03086 0.01029 0.29047">
+	  <freejoint/>
+	  <geom name="g5" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg6" pos="0.06374 0.02125 0.29310">
+	  <freejoint/>
+	  <geom name="g6" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg7" pos="0.09662 0.03221 0.29573">
+	  <freejoint/>
+	  <geom name="g7" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg8" pos="0.12951 0.04317 0.29836">
+	  <freejoint/>
+	  <geom name="g8" fromto="-0.01644 -0.00548 -0.00132 0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg9" pos="0.14797 0.03409 0.29984">
+	  <freejoint/>
+	  <geom name="g9" fromto="-0.00203 0.01456 -0.00016 0.00203 -0.01456 0.00016"/>
+	</body>
+	<body name="seg10" pos="0.15000 0.00214 0.30000">
+	  <freejoint/>
+	  <geom name="g10" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
+	</body>
+	<body name="seg11" pos="0.15000 -0.03262 0.30000">
+	  <freejoint/>
+	  <geom name="g11" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
+	</body>
+	<body name="seg12" pos="0.13356 -0.04452 0.30132">
+	  <freejoint/>
+	  <geom name="g12" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg13" pos="0.10068 -0.03356 0.30395">
+	  <freejoint/>
+	  <geom name="g13" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg14" pos="0.06779 -0.02260 0.30658">
+	  <freejoint/>
+	  <geom name="g14" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg15" pos="0.03491 -0.01164 0.30921">
+	  <freejoint/>
+	  <geom name="g15" fromto="0.01644 -0.00548 -0.00132 -0.01644 0.00548 0.00132"/>
+	</body>
+	<body name="seg16" pos="0.00203 -0.00068 0.31068">
+	  <freejoint/>
+	  <geom name="g16" fromto="0.01644 -0.00548 -0.00016 -0.01644 0.00548 0.00016"/>
+	</body>
+	<body name="seg17" pos="-0.03086 0.01029 0.30953">
+	  <freejoint/>
+	  <geom name="g17" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg18" pos="-0.06374 0.02125 0.30690">
+	  <freejoint/>
+	  <geom name="g18" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg19" pos="-0.09662 0.03221 0.30427">
+	  <freejoint/>
+	  <geom name="g19" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg20" pos="-0.12951 0.04317 0.30164">
+	  <freejoint/>
+	  <geom name="g20" fromto="0.01644 -0.00548 0.00132 -0.01644 0.00548 -0.00132"/>
+	</body>
+	<body name="seg21" pos="-0.14797 0.03409 0.30016">
+	  <freejoint/>
+	  <geom name="g21" fromto="0.00203 0.01456 0.00016 -0.00203 -0.01456 -0.00016"/>
+	</body>
+	<body name="seg22" pos="-0.15000 0.00214 0.30000">
+	  <freejoint/>
+	  <geom name="g22" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
+	</body>
+	<body name="seg23" pos="-0.15000 -0.03262 0.30000">
+	  <freejoint/>
+	  <geom name="g23" fromto="0.00000 0.01738 0.00000 0.00000 -0.01738 0.00000"/>
+	</body>
   </worldbody>
   <equality>
-    <connect name="link0" body1="seg0" body2="seg1" anchor="0.01644 0.00548 -0.00132"/>
-    <connect name="link1" body1="seg1" body2="seg2" anchor="0.01644 0.00548 -0.00132"/>
-    <connect name="link2" body1="seg2" body2="seg3" anchor="0.01644 0.00548 -0.00132"/>
-    <connect name="link3" body1="seg3" body2="seg4" anchor="0.01644 0.00548 -0.00132"/>
-    <connect name="link4" body1="seg4" body2="seg5" anchor="0.01644 0.00548 -0.00016"/>
-    <connect name="link5" body1="seg5" body2="seg6" anchor="0.01644 0.00548 0.00132"/>
-    <connect name="link6" body1="seg6" body2="seg7" anchor="0.01644 0.00548 0.00132"/>
-    <connect name="link7" body1="seg7" body2="seg8" anchor="0.01644 0.00548 0.00132"/>
-    <connect name="link8" body1="seg8" body2="seg9" anchor="0.01644 0.00548 0.00132"/>
-    <connect name="link9" body1="seg9" body2="seg10" anchor="0.00203 -0.01456 0.00016"/>
-    <connect name="link10" body1="seg10" body2="seg11" anchor="0.00000 -0.01738 0.00000"/>
-    <connect name="link11" body1="seg11" body2="seg12" anchor="0.00000 -0.01738 0.00000"/>
-    <connect name="link12" body1="seg12" body2="seg13" anchor="-0.01644 0.00548 0.00132"/>
-    <connect name="link13" body1="seg13" body2="seg14" anchor="-0.01644 0.00548 0.00132"/>
-    <connect name="link14" body1="seg14" body2="seg15" anchor="-0.01644 0.00548 0.00132"/>
-    <connect name="link15" body1="seg15" body2="seg16" anchor="-0.01644 0.00548 0.00132"/>
-    <connect name="link16" body1="seg16" body2="seg17" anchor="-0.01644 0.00548 0.00016"/>
-    <connect name="link17" body1="seg17" body2="seg18" anchor="-0.01644 0.00548 -0.00132"/>
-    <connect name="link18" body1="seg18" body2="seg19" anchor="-0.01644 0.00548 -0.00132"/>
-    <connect name="link19" body1="seg19" body2="seg20" anchor="-0.01644 0.00548 -0.00132"/>
-    <connect name="link20" body1="seg20" body2="seg21" anchor="-0.01644 0.00548 -0.00132"/>
-    <connect name="link21" body1="seg21" body2="seg22" anchor="-0.00203 -0.01456 -0.00016"/>
-    <connect name="link22" body1="seg22" body2="seg23" anchor="0.00000 -0.01738 0.00000"/>
-    <connect name="link23" body1="seg23" body2="seg0" anchor="0.00000 -0.01738 0.00000"/>
-    <connect name="hold_left_thumb" body1="seg0" anchor="-0.01644 -0.00548 0.00132"/>
-    <connect name="hold_right_index" body1="seg9" anchor="0.00203 0.01591 0.00016"/>
-    <connect name="hold_right_thumb" body1="seg12" anchor="0.01644 -0.00548 -0.00132"/>
-    <connect name="hold_left_index" body1="seg21" anchor="-0.00203 0.01591 -0.00016"/>
+	<connect name="link0" body1="seg0" body2="seg1" anchor="0.01644 0.00548 -0.00132"/>
+	<connect name="link1" body1="seg1" body2="seg2" anchor="0.01644 0.00548 -0.00132"/>
+	<connect name="link2" body1="seg2" body2="seg3" anchor="0.01644 0.00548 -0.00132"/>
+	<connect name="link3" body1="seg3" body2="seg4" anchor="0.01644 0.00548 -0.00132"/>
+	<connect name="link4" body1="seg4" body2="seg5" anchor="0.01644 0.00548 -0.00016"/>
+	<connect name="link5" body1="seg5" body2="seg6" anchor="0.01644 0.00548 0.00132"/>
+	<connect name="link6" body1="seg6" body2="seg7" anchor="0.01644 0.00548 0.00132"/>
+	<connect name="link7" body1="seg7" body2="seg8" anchor="0.01644 0.00548 0.00132"/>
+	<connect name="link8" body1="seg8" body2="seg9" anchor="0.01644 0.00548 0.00132"/>
+	<connect name="link9" body1="seg9" body2="seg10" anchor="0.00203 -0.01456 0.00016"/>
+	<connect name="link10" body1="seg10" body2="seg11" anchor="0.00000 -0.01738 0.00000"/>
+	<connect name="link11" body1="seg11" body2="seg12" anchor="0.00000 -0.01738 0.00000"/>
+	<connect name="link12" body1="seg12" body2="seg13" anchor="-0.01644 0.00548 0.00132"/>
+	<connect name="link13" body1="seg13" body2="seg14" anchor="-0.01644 0.00548 0.00132"/>
+	<connect name="link14" body1="seg14" body2="seg15" anchor="-0.01644 0.00548 0.00132"/>
+	<connect name="link15" body1="seg15" body2="seg16" anchor="-0.01644 0.00548 0.00132"/>
+	<connect name="link16" body1="seg16" body2="seg17" anchor="-0.01644 0.00548 0.00016"/>
+	<connect name="link17" body1="seg17" body2="seg18" anchor="-0.01644 0.00548 -0.00132"/>
+	<connect name="link18" body1="seg18" body2="seg19" anchor="-0.01644 0.00548 -0.00132"/>
+	<connect name="link19" body1="seg19" body2="seg20" anchor="-0.01644 0.00548 -0.00132"/>
+	<connect name="link20" body1="seg20" body2="seg21" anchor="-0.01644 0.00548 -0.00132"/>
+	<connect name="link21" body1="seg21" body2="seg22" anchor="-0.00203 -0.01456 -0.00016"/>
+	<connect name="link22" body1="seg22" body2="seg23" anchor="0.00000 -0.01738 0.00000"/>
+	<connect name="link23" body1="seg23" body2="seg0" anchor="0.00000 -0.01738 0.00000"/>
+	<connect name="hold_left_thumb" body1="seg0" anchor="-0.01644 -0.00548 0.00132"/>
+	<connect name="hold_right_index" body1="seg9" anchor="0.00203 0.01591 0.00016"/>
+	<connect name="hold_right_thumb" body1="seg12" anchor="0.01644 -0.00548 -0.00132"/>
+	<connect name="hold_left_index" body1="seg21" anchor="-0.00203 0.01591 -0.00016"/>
   </equality>
   <contact>
-    <exclude body1="seg0" body2="seg1"/>
-    <exclude body1="seg0" body2="seg2"/>
-    <exclude body1="seg1" body2="seg2"/>
-    <exclude body1="seg1" body2="seg3"/>
-    <exclude body1="seg2" body2="seg3"/>
-    <exclude body1="seg2" body2="seg4"/>
-    <exclude body1="seg3" body2="seg4"/>
-    <exclude body1="seg3" body2="seg5"/>
-    <exclude body1="seg4" body2="seg5"/>
-    <exclude body1="seg4" body2="seg6"/>
-    <exclude body1="seg5" body2="seg6"/>
-    <exclude body1="seg5" body2="seg7"/>
-    <exclude body1="seg6" body2="seg7"/>
-    <exclude body1="seg6" body2="seg8"/>
-    <exclude body1="seg7" body2="seg8"/>
-    <exclude body1="seg7" body2="seg9"/>
-    <exclude body1="seg8" body2="seg9"/>
-    <exclude body1="seg8" body2="seg10"/>
-    <exclude body1="seg9" body2="seg10"/>
-    <exclude body1="seg9" body2="seg11"/>
-    <exclude body1="seg10" body2="seg11"/>
-    <exclude body1="seg10" body2="seg12"/>
-    <exclude body1="seg11" body2="seg12"/>
-    <exclude body1="seg11" body2="seg13"/>
-    <exclude body1="seg12" body2="seg13"/>
-    <exclude body1="seg12" body2="seg14"/>
-    <exclude body1="seg13" body2="seg14"/>
-    <exclude body1="seg13" body2="seg15"/>
-    <exclude body1="seg14" body2="seg15"/>
-    <exclude body1="seg14" body2="seg16"/>
-    <exclude body1="seg15" body2="seg16"/>
-    <exclude body1="seg15" body2="seg17"/>
-    <exclude body1="seg16" body2="seg17"/>
-    <exclude body1="seg16" body2="seg18"/>
-    <exclude body1="seg17" body2="seg18"/>
-    <exclude body1="seg17" body2="seg19"/>
-    <exclude body1="seg18" body2="seg19"/>
-    <exclude body1="seg18" body2="seg20"/>
-    <exclude body1="seg19" body2="seg20"/>
-    <exclude body1="seg19" body2="seg21"/>
-    <exclude body1="seg20" body2="seg21"/>
-    <exclude body1="seg20" body2="seg22"/>
-    <exclude body1="seg21" body2="seg22"/>
-    <exclude body1="seg21" body2="seg23"/>
-    <exclude body1="seg22" body2="seg23"/>
-    <exclude body1="seg22" body2="seg0"/>
-    <exclude body1="seg23" body2="seg0"/>
-    <exclude body1="seg23" body2="seg1"/>
+	<exclude body1="seg0" body2="seg1"/>
+	<exclude body1="seg0" body2="seg2"/>
+	<exclude body1="seg1" body2="seg2"/>
+	<exclude body1="seg1" body2="seg3"/>
+	<exclude body1="seg2" body2="seg3"/>
+	<exclude body1="seg2" body2="seg4"/>
+	<exclude body1="seg3" body2="seg4"/>
+	<exclude body1="seg3" body2="seg5"/>
+	<exclude body1="seg4" body2="seg5"/>
+	<exclude body1="seg4" body2="seg6"/>
+	<exclude body1="seg5" body2="seg6"/>
+	<exclude body1="seg5" body2="seg7"/>
+	<exclude body1="seg6" body2="seg7"/>
+	<exclude body1="seg6" body2="seg8"/>
+	<exclude body1="seg7" body2="seg8"/>
+	<exclude body1="seg7" body2="seg9"/>
+	<exclude body1="seg8" body2="seg9"/>
+	<exclude body1="seg8" body2="seg10"/>
+	<exclude body1="seg9" body2="seg10"/>
+	<exclude body1="seg9" body2="seg11"/>
+	<exclude body1="seg10" body2="seg11"/>
+	<exclude body1="seg10" body2="seg12"/>
+	<exclude body1="seg11" body2="seg12"/>
+	<exclude body1="seg11" body2="seg13"/>
+	<exclude body1="seg12" body2="seg13"/>
+	<exclude body1="seg12" body2="seg14"/>
+	<exclude body1="seg13" body2="seg14"/>
+	<exclude body1="seg13" body2="seg15"/>
+	<exclude body1="seg14" body2="seg15"/>
+	<exclude body1="seg14" body2="seg16"/>
+	<exclude body1="seg15" body2="seg16"/>
+	<exclude body1="seg15" body2="seg17"/>
+	<exclude body1="seg16" body2="seg17"/>
+	<exclude body1="seg16" body2="seg18"/>
+	<exclude body1="seg17" body2="seg18"/>
+	<exclude body1="seg17" body2="seg19"/>
+	<exclude body1="seg18" body2="seg19"/>
+	<exclude body1="seg18" body2="seg20"/>
+	<exclude body1="seg19" body2="seg20"/>
+	<exclude body1="seg19" body2="seg21"/>
+	<exclude body1="seg20" body2="seg21"/>
+	<exclude body1="seg20" body2="seg22"/>
+	<exclude body1="seg21" body2="seg22"/>
+	<exclude body1="seg21" body2="seg23"/>
+	<exclude body1="seg22" body2="seg23"/>
+	<exclude body1="seg22" body2="seg0"/>
+	<exclude body1="seg23" body2="seg0"/>
+	<exclude body1="seg23" body2="seg1"/>
   </contact>
 </mujoco>
