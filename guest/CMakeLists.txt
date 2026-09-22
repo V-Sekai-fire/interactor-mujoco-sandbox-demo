@@ -13,11 +13,11 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_custom_command(
 	OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/model_data.h"
 	COMMAND ${Python3_EXECUTABLE} "${DEMO_ROOT}/scripts/embed_model.py"
-			"${DEMO_ROOT}/project/plans/cats_cradle.xml"
+			"${DEMO_ROOT}/project/plans/newtons_cradle.xml"
 			"${CMAKE_CURRENT_BINARY_DIR}/model_data.h"
-	DEPENDS "${DEMO_ROOT}/project/plans/cats_cradle.xml"
+	DEPENDS "${DEMO_ROOT}/project/plans/newtons_cradle.xml"
 			"${DEMO_ROOT}/scripts/embed_model.py"
-	COMMENT "Embedding cats_cradle.xml into the guest")
+	COMMENT "Embedding newtons_cradle.xml into the guest")
 
 add_sandbox_program(mjstep main.cpp "${CMAKE_CURRENT_BINARY_DIR}/model_data.h")
 target_include_directories(mjstep PRIVATE "${MJ}/include" "${CMAKE_CURRENT_BINARY_DIR}")

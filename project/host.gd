@@ -116,8 +116,12 @@ func _build_meshes(offset: Vector3, tint: Color) -> Array[MeshInstance3D]:
 	mat.albedo_color = tint
 	mat.roughness = 0.6
 
+	# MuJoCo is Z-up, Godot is Y-up. Rotating the holder a quarter turn about X
+	# converts both the positions and the orientations underneath it, so the
+	# guest keeps handing over MuJoCo coordinates untouched.
 	var holder := Node3D.new()
 	holder.position = offset
+	holder.rotation = Vector3(-PI / 2.0, 0, 0)
 	add_child(holder)
 
 	var out: Array[MeshInstance3D] = []

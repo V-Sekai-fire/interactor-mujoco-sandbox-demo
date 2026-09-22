@@ -3,3 +3,4 @@ build/
 __pycache__/
 build/
 tests/guest/build/
+model/.lake/

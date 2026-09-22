@@ -202,6 +202,35 @@ static Variant mjc_bodies() {
 	return PackedArray<double>(out);
 }
 
+// Every geom as type, three sizes, position and orientation. This is what a
+// host draws: a body frame sits at its joint, not at the shape hanging off it.
+static Variant mjc_geoms() {
+	Array out = Array::Create();
+	if (g_model == nullptr || g_data == nullptr) {
+		return out;
+	}
+	for (int i = 0; i < g_model->ngeom; i++) {
+		out.push_back((double)g_model->geom_type[i]);
+		out.push_back(g_model->geom_size[i * 3 + 0]);
+		out.push_back(g_model->geom_size[i * 3 + 1]);
+		out.push_back(g_model->geom_size[i * 3 + 2]);
+		out.push_back(g_data->geom_xpos[i * 3 + 0]);
+		out.push_back(g_data->geom_xpos[i * 3 + 1]);
+		out.push_back(g_data->geom_xpos[i * 3 + 2]);
+		double quat[4];
+		mju_mat2Quat(quat, g_data->geom_xmat + i * 9);
+		out.push_back(quat[0]);
+		out.push_back(quat[1]);
+		out.push_back(quat[2]);
+		out.push_back(quat[3]);
+	}
+	return out;
+}
+
+static Variant mjc_ngeom() {
+	return g_model == nullptr ? 0 : (int)g_model->ngeom;
+}
+
 // Simulated time, so a restored run can be shown resuming rather than restarting.
 static Variant mjc_time() {
 	return g_data == nullptr ? 0.0 : (double)g_data->time;
@@ -240,6 +269,8 @@ int main() {
 	ADD_API_FUNCTION(mjc_ncon, "int", "", "Active contacts this step");
 	ADD_API_FUNCTION(mjc_nbody, "int", "", "Number of bodies");
 	ADD_API_FUNCTION(mjc_bodies, "PackedFloat64Array", "", "Body transforms as x,y,z,qw,qx,qy,qz");
+	ADD_API_FUNCTION(mjc_ngeom, "int", "", "Number of geoms");
+	ADD_API_FUNCTION(mjc_geoms, "Array", "", "Geoms as type, size xyz, pos xyz, quat wxyz");
 	ADD_API_FUNCTION(mjc_time, "float", "", "Simulated time");
 	ADD_API_FUNCTION(mjc_qpos, "PackedFloat64Array", "", "Generalised positions");
 	ADD_API_FUNCTION(mjc_digest, "int", "", "Digest of the full integration state");

@@ -1,0 +1,5 @@
+name = "sandboxmem"
+defaultTargets = ["SandboxMem"]
+
+[[lean_lib]]
+name = "SandboxMem"
