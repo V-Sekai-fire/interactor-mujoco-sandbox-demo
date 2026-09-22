@@ -49,9 +49,9 @@ var _pivots: PackedFloat64Array = PackedFloat64Array()
 
 # The model's own timestep, and a carry so the guest is stepped to wall-clock
 # rather than a fixed count per frame. A fixed count tied the sim speed to the
-# frame rate: at 60 fps and 4 steps of 0.2 ms it ran at about 5% of real time.
-const SIM_TIMESTEP := 0.001
-const MAX_STEPS_PER_FRAME := 240  # ~0.048 s of sim; caps catch-up after a stall
+# frame rate: at 60 fps and 4 steps of 0.5 ms it ran at about 12% of real time.
+const SIM_TIMESTEP := 0.0005
+const MAX_STEPS_PER_FRAME := 240  # ~0.12 s of sim; caps catch-up after a stall
 var _sim_carry := 0.0
 
 
@@ -159,9 +159,9 @@ func _make_sandbox() -> Object:
 	return sb
 
 
-## The host owns the tick. Four steps a frame at a 0.2 ms timestep keeps the
-## collision stiff enough to read as elastic without the frame rate deciding
-## how fast the figure swings.
+## The host owns the tick. The guest is stepped to wall-clock at the model's
+## 0.5 ms timestep, so the frame rate does not decide how fast the figure
+## swings and the stiff collision still reads as elastic.
 func _process(_delta: float) -> void:
 	if _a == null:
 		return
