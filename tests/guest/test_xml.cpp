@@ -64,7 +64,11 @@ std::string make_name(witness::RNG &rng, const witness::Level &lvl) {
 	const uint32_t n = rng.uint_range(1, bound + 1);
 	std::string s;
 	for (uint32_t i = 0; i < n; i++) {
-		s.push_back(charset[rng.uint_range(0, sizeof(charset) - 1)]);
+		// uint_range is inclusive and sizeof counts the terminator, so the last
+		// real character is at sizeof - 2. Using sizeof - 1 reaches the '\0' and
+		// splices it into the name, which MuJoCo rejects -- the counterexample
+		// the "any valid body name loads" property kept finding.
+		s.push_back(charset[rng.uint_range(0, sizeof(charset) - 2)]);
 	}
 	// A leading digit is not a valid identifier; keep the generator on-model.
 	if (s[0] >= '0' && s[0] <= '9') {
@@ -97,7 +101,27 @@ TEST_CASE("[property] any valid body name loads") {
 		return loads(xml, err, (int)sizeof(err));
 	};
 	witness::Trial t = witness::resolve<std::string>("named body loads", gen, pred);
-	CHECK(t.outcome != witness::Outcome::FOUND);
+	CHECK(t.outcome == witness::Outcome::PROVABLY_NONE);
+}
+
+// What MuJoCo actually accepts for a name, measured rather than assumed. An
+// empty name loads; a name with an embedded null does not. The generator above
+// must never emit the second, which is exactly what the sizeof - 1 off-by-one
+// used to do.
+TEST_CASE("[unit] an empty body name loads but an embedded null does not") {
+	char err[256] = { 0 };
+	const std::string ok =
+			"<mujoco><worldbody><body name=\"\">"
+			"<geom type=\"sphere\" size=\"0.1\"/></body></worldbody></mujoco>";
+	CHECK(loads(ok, err, (int)sizeof(err)));
+
+	std::string name = "ab";
+	name.push_back('\0');
+	name += "c";
+	const std::string bad =
+			"<mujoco><worldbody><body name=\"" + name +
+			"\"><geom type=\"sphere\" size=\"0.1\"/></body></worldbody></mujoco>";
+	CHECK_FALSE(loads(bad, err, (int)sizeof(err)));
 }
 
 // Without this the loading property could pass because everything loads,

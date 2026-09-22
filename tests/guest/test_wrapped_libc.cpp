@@ -33,7 +33,9 @@ Prefix make_prefix(witness::RNG &rng, const witness::Level &lvl) {
 	const uint32_t len = rng.uint_range(1, bound + 2);
 	Prefix pf;
 	for (uint32_t i = 0; i < len; i++) {
-		pf.haystack.push_back(charset[rng.uint_range(0, sizeof(charset) - 1)]);
+		// uint_range is inclusive and sizeof counts the terminator; sizeof - 1
+		// would reach the '\0' and put a stray null in the string.
+		pf.haystack.push_back(charset[rng.uint_range(0, sizeof(charset) - 2)]);
 	}
 	pf.n = (size_t)rng.uint_range(1, (uint32_t)pf.haystack.size() + 1);
 	return pf;
