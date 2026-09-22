@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+#ifndef AVBD_CPU_H
+#define AVBD_CPU_H
+
+#include <cstdint>
+#include <vector>
+
+// Portable CPU AVBD driver. Host-side transcription of AvbdSolver.mm's
+// setupMesh / upload* / step / stepDual*, calling the slangc -target cpp
+// kernels instead of Metal. Exception-free; vec3 buffers are tight 3-float.
+class AvbdCpu {
+public:
+	void setupMesh(uint32_t nVerts, const float *positions, const float *predicted,
+			const float *mass, float invHSquared);
+	void uploadSprings(uint32_t nSprings, const uint32_t *p1Idx, const uint32_t *p2Idx,
+			const float *restLen, const float *stiffness);
+	void uploadAttachments(uint32_t nAttach, const uint32_t *vertIdx,
+			const float *fixedPos, const float *stiffness);
+	void uploadTriangles(uint32_t nTri, const uint32_t *triIdx, const float *invUV,
+			const float *stiffness);
+	void uploadBendings(uint32_t nBend, const uint32_t *bendIdx, const float *weight,
+			const float *nTarget, const float *stiffness);
+
+	// Greedy first-fit vertex coloring over the constraint graph. Turns the
+	// per-color sweep into Gauss-Seidel, which converges far faster than the
+	// default single-color Jacobi and gives the independent blocks that a
+	// per-island sandbox can own.
+	void buildColoring();
+
+	void setGammaScale(float scale);
+	void updateState(const float *positions, const float *predicted);
+	void updateAttachmentFixedPos(const float *fixedPos);
+
+	int step();
+	int stepDualAttachments();
+	int stepDualMembrane();
+	int stepDualBending();
+
+	// Restrict the solved set to the first `nOwned` vertices; the trailing
+	// vertices become fixed ghosts (read by force kernels, never updated).
+	// This is what lets one connected panel be split across tiles: each tile
+	// owns its interior and holds its neighbours' boundary as ghosts.
+	void restrictToOwned(uint32_t nOwned);
+	void setPositions(const float *positions);
+
+	void readPositions(std::vector<float> &out) const;
+	uint32_t nVerts() const { return nVerts_; }
+	bool ready() const { return meshReady_; }
+
+private:
+	uint32_t nVerts_ = 0, nSprings_ = 0, nAttach_ = 0, nTri_ = 0, nBend_ = 0;
+	float invHSq_ = 0.0f;
+	bool meshReady_ = false;
+
+	// Per-vertex state. positions/predicted/gScratch are tight 3-float vec3.
+	std::vector<float> positions_, predicted_, gScratch_, mass_, hScratch_;
+	std::vector<uint32_t> vertPerm_, colorOffsets_{ 0u, 0u };
+
+	std::vector<uint32_t> springP1_, springP2_;
+	std::vector<float> springRest_, springStiff_, springGradA_, springHess_;
+	std::vector<uint32_t> vSpringOff_, vSpringIdx_, vSpringRole_;
+
+	std::vector<uint32_t> attachVert_;
+	std::vector<float> attachFixed_, attachStiff_, attachLambda_, attachGamma_;
+	std::vector<float> attachGradV_, attachHess_;
+	std::vector<uint32_t> vAttachOff_, vAttachIdx_;
+
+	std::vector<uint32_t> triIdx_;
+	std::vector<float> triInvUV_, triStiff_, triLambda0_, triLambda1_, triGamma_;
+	std::vector<float> triGrad_, triHess_;
+	std::vector<uint32_t> vTriOff_, vTriIdx_, vTriRole_;
+
+	std::vector<uint32_t> bendIdx_;
+	std::vector<float> bendWeight_, bendNTarget_, bendStiff_, bendLambda_, bendGamma_;
+	std::vector<float> bendGrad_, bendHess_;
+	std::vector<uint32_t> vBendOff_, vBendIdx_, vBendRole_;
+};
+
+#endif // AVBD_CPU_H

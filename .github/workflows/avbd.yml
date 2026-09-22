@@ -1,0 +1,37 @@
+name: avbd
+
+# Builds and runs the AVBD cloth test suites from the committed Slang-emitted
+# kernels (guest-avbd/gen) and the vendored Slang cpp prelude
+# (guest-avbd/slang-rt), so the gate needs neither Lean nor slangc. It proves
+# the solver is correct (oracle), deterministic (drape), and that independent
+# and domain-decomposed islands parallelise without changing the result.
+
+on:
+  push:
+    paths:
+      - "3-interactor/mujoco-sandbox-demo/guest-avbd/**"
+      - ".github/workflows/avbd.yml"
+  pull_request:
+    paths:
+      - "3-interactor/mujoco-sandbox-demo/guest-avbd/**"
+  merge_group:
+
+jobs:
+  avbd-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 3-interactor/mujoco-sandbox-demo/guest-avbd
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Build and run the AVBD suites
+        run: |
+          mkdir -p build
+          for t in oracle drape parallel_islands split_panel; do
+            clang++ -std=c++17 -O2 -pthread -Wno-unused-parameter \
+              -I gen -I slang-rt \
+              avbd_cpu.cpp cloth_grid.cpp tests/$t.cpp -o build/$t
+            ./build/$t
+          done
