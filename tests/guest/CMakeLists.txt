@@ -13,7 +13,8 @@ add_sandbox_program(mjtests
 	test_strings.cpp
 	test_alloc.cpp
 	test_xml.cpp
-	test_wrapped_libc.cpp)
+	test_wrapped_libc.cpp
+	test_frames.cpp)
 
 target_include_directories(mjtests PRIVATE
 	"${MJ}/include"
