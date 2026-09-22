@@ -45,7 +45,7 @@ SWING = LIFT
 # fans the row; a coarser step loses too much on each strike.
 TIMESTEP = 0.0005
 ITERATIONS = 50
-SOLREF = "-2000000 -20"
+SOLREF = "-6000000 -20"
 SOLIMP = "0.98 0.999 0.0002"
 
 
