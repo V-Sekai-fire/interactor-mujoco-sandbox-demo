@@ -19,7 +19,7 @@ index 2442651..40617d3 100644
  #ifdef RISCV_VIRTUAL_PAGING
  		const size_t est_page_bytes =
 diff --git a/lib/libriscv/tr_compiler.cpp b/lib/libriscv/tr_compiler.cpp
-index 98edfb7..836cdb4 100644
+index 98edfb7..17e75d1 100644
 --- a/lib/libriscv/tr_compiler.cpp
 +++ b/lib/libriscv/tr_compiler.cpp
 @@ -1,5 +1,6 @@
@@ -29,6 +29,24 @@ index 98edfb7..836cdb4 100644
  #include <cstring>
  #if defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)
  #include "win32/dlfcn.h"
+@@ -41,7 +42,7 @@ namespace riscv
+ {
+ 	std::string compile_command(int /*arch*/, const std::string& cflags)
+ 	{
+-		return compiler() + " -O2 -s -std=c99 -fPIC -shared -rdynamic -x c "
++		return compiler() + " -O2 -s -std=c99 -ffp-contract=off -fPIC -shared -rdynamic -x c "
+ 			" -fexceptions -fvisibility=hidden -fomit-frame-pointer " +
+ #ifdef RISCV_EXT_VECTOR
+ 			" -march=native" +
+@@ -104,7 +105,7 @@ namespace riscv
+ 		const std::string& cflags, const MachineTranslationCrossOptions& cross_options)
+ 	{
+ 		// We always want to produce a generic PE-dll that can be loaded on *most* Windows machines.
+-		return cross_options.cross_compiler + " -O2 -s -std=c99 -fPIC -shared -x c "
++		return cross_options.cross_compiler + " -O2 -s -std=c99 -ffp-contract=off -fPIC -shared -x c "
+ 			" -fexceptions -fvisibility=hidden -fomit-frame-pointer " +
+ 			cflags +
+ 			" -DARCH=" + host_arch() + ""
 diff --git a/lib/libriscv/tr_emit.cpp b/lib/libriscv/tr_emit.cpp
 index e53842f..f8177b6 100644
 --- a/lib/libriscv/tr_emit.cpp

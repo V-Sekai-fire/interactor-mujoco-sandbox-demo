@@ -6,6 +6,10 @@ the extension can be rebuilt from what is committed.
 
 `libriscv-paging-and-includes.patch`
 
+- `tr_compiler.cpp` compiles the binary-translated guest with
+  `-ffp-contract=off`. Without it the host compiler may fuse a guest's separate
+  FMUL+FADD into one FMA, which rounds differently across CPUs and compilers and
+  breaks the cross-platform determinism translation is meant to preserve.
 - `serialize.cpp` no longer refuses a flat read-write arena. Arena pages already
   appear in `m_pages` as non-owning entries pointing into the buffer, and
   `deserialize_from` already rebuilds them that way, so only the throw stood
