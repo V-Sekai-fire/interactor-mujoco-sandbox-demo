@@ -1,5 +1,7 @@
 extends RefCounted
 
+## Named PointOfInterest here and LassoPoint in the native module; the alias
+## below lets either name be used.
 class PointOfInterest:
 	extends RefCounted
 	@export var snapping_power: float = 1.0
@@ -97,6 +99,48 @@ class PointOfInterest:
 		'''
 		return Vector3.ZERO
 
+	## The names the native LassoPoint binds, so code written against either
+	## implementation runs on this one. modules/lasso in entities-godot is the
+	## reference; this script is the fallback when that module is absent.
+	func valid_origin() -> bool:
+		return is_valid_origin()
+
+	func matching_origin(p_origin: Node) -> bool:
+		return origin == p_origin
+
+	func get_origin() -> Node3D:
+		return origin
+
+	func get_snap_score() -> float:
+		return last_snap_score
+
+	func set_snap_score(score: float) -> void:
+		last_snap_score = score
+
+	func enable_snapping(on: bool) -> void:
+		snapping_enabled = on
+
+	func get_snapping_enabled() -> bool:
+		return snapping_enabled
+
+	func set_snap_locked(p_enable: bool) -> void:
+		snap_locked = p_enable
+
+	func get_snap_locked() -> bool:
+		return snap_locked
+
+	func set_size(p_size: float) -> void:
+		size = p_size
+
+	func get_size() -> float:
+		return size
+
+	func set_snapping_power(p_snapping_power: float) -> void:
+		snapping_power = p_snapping_power
+
+	func get_snapping_power() -> float:
+		return snapping_power
+
 	func is_valid_origin() -> bool:
 		return origin != null and origin.is_visible_in_tree() and snapping_enabled
 
@@ -183,7 +227,12 @@ func query(query: LassoQuery) -> bool:
 			var point_local: Vector3 = next.get_origin_transformed_pos(query.source)
 			var euclidian_dist: float = point_local.length()
 			var angular_dist: float = point_local.angle_to(Vector3(0, 0, -1))
-			var rejection_length: float = point_local.length() # Vector3(point_local[0], point_local[1], 0).length()
+			# The perpendicular distance from the ray, not the distance to the
+			# controller. This is the test for whether the ray passes within the
+			# point's radius, which is what earns the dead-on bonus below; the
+			# full length almost never clears it, so the bonus never fired.
+			# Matches LassoDB::calc_top_two_snapping_power in modules/lasso.
+			var rejection_length: float = Vector3(point_local.x, point_local.y, 0.0).length()
 
 			var snapping_power: float = 0
 			if rejection_length <= next.size:
@@ -287,3 +336,8 @@ func calc_top_redirecting_power(snapped_origin: PointOfInterest,
 			output = first
 
 	return output
+
+## The native module registers this type as LassoPoint. Declared as a class
+## rather than a const so it can be reached the same way from outside.
+class LassoPoint extends PointOfInterest:
+	pass

@@ -5,6 +5,7 @@
 #include <clocale>
 #include <cstdint>
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -231,6 +232,52 @@ static Variant mjc_ngeom() {
 	return g_model == nullptr ? 0 : (int)g_model->ngeom;
 }
 
+// Hold one hinge at an angle, as a hand holding a ball does: the joint is
+// placed and its velocity cleared, so releasing it starts from rest rather
+// than from whatever the solver had accumulated.
+static Variant mjc_hold(Variant index, Variant angle) {
+	if (g_model == nullptr || g_data == nullptr) {
+		return false;
+	}
+	const int i = (int)(int64_t)index;
+	if (i < 0 || i >= g_model->nq) {
+		return false;
+	}
+	g_data->qpos[i] = (double)angle;
+	g_data->qvel[i] = 0.0;
+	mj_forward(g_model, g_data);
+	return true;
+}
+
+// Where each hinge sits and how far its ball hangs below it, so the host can
+// turn a point in space into an angle without being told the model.
+static Variant mjc_pivots() {
+	std::vector<double> out;
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(out);
+	}
+	for (int j = 0; j < g_model->njnt; j++) {
+		const int b = g_model->jnt_bodyid[j];
+		const double px = g_data->xanchor[j * 3 + 0];
+		const double pz = g_data->xanchor[j * 3 + 2];
+		// The ball is the last geom on the body; its distance from the anchor
+		// is the pendulum length.
+		double len = 0.0;
+		for (int g = 0; g < g_model->ngeom; g++) {
+			if (g_model->geom_bodyid[g] != b || g_model->geom_type[g] != mjGEOM_SPHERE) {
+				continue;
+			}
+			const double dx = g_data->geom_xpos[g * 3 + 0] - px;
+			const double dz = g_data->geom_xpos[g * 3 + 2] - pz;
+			len = sqrt(dx * dx + dz * dz);
+		}
+		out.push_back(px);
+		out.push_back(pz);
+		out.push_back(len);
+	}
+	return PackedArray<double>(out);
+}
+
 // Simulated time, so a restored run can be shown resuming rather than restarting.
 static Variant mjc_time() {
 	return g_data == nullptr ? 0.0 : (double)g_data->time;
@@ -271,6 +318,8 @@ int main() {
 	ADD_API_FUNCTION(mjc_bodies, "PackedFloat64Array", "", "Body transforms as x,y,z,qw,qx,qy,qz");
 	ADD_API_FUNCTION(mjc_ngeom, "int", "", "Number of geoms");
 	ADD_API_FUNCTION(mjc_geoms, "Array", "", "Geoms as type, size xyz, pos xyz, quat wxyz");
+	ADD_API_FUNCTION(mjc_hold, "bool", "int index, float angle", "Hold a hinge at an angle");
+	ADD_API_FUNCTION(mjc_pivots, "PackedFloat64Array", "", "Per joint: anchor x, anchor z, pendulum length");
 	ADD_API_FUNCTION(mjc_time, "float", "", "Simulated time");
 	ADD_API_FUNCTION(mjc_qpos, "PackedFloat64Array", "", "Generalised positions");
 	ADD_API_FUNCTION(mjc_digest, "int", "", "Digest of the full integration state");
