@@ -1,6 +1,6 @@
 extends Node3D
 
-## A cat's cradle simulated inside a RISC-V sandbox, and moved between two of
+## Newton's cradle simulated inside a RISC-V sandbox, and moved between two of
 ## them while it runs.
 ##
 ## Two sandboxes stand side by side. The left one steps the figure; the right
@@ -15,13 +15,11 @@ extends Node3D
 
 const PHYSICS_ELF := "res://plans/mujoco.elf"
 const SNAPSHOT_PATH := "user://cradle.snapshot"
-const SEG_RADIUS := 0.003
-const SEG_LENGTH := 0.0348
 
 var _a: Object = null
 var _b: Object = null
-var _a_meshes: Array[MeshInstance3D] = []
-var _b_meshes: Array[MeshInstance3D] = []
+var _a_holder: Node3D = null
+var _b_holder: Node3D = null
 var _running := true
 var _snapshot := PackedByteArray()
 
@@ -40,8 +38,8 @@ func _ready() -> void:
 		_say("[color=red]the guest could not build its model[/color]")
 		return
 
-	_a_meshes = _build_meshes(Vector3(-0.22, 0, 0), Color(0.95, 0.85, 0.55))
-	_b_meshes = _build_meshes(Vector3(0.22, 0, 0), Color(0.55, 0.8, 0.95))
+	_a_holder = _build_meshes(Vector3(-0.09, 0, 0), Color(0.93, 0.80, 0.42))
+	_b_holder = _build_meshes(Vector3(0.09, 0, 0), Color(0.55, 0.78, 0.96))
 	_say("left sandbox loaded the figure: nq=%d, %d equality constraints" % [
 		_a.vmcall("mjc_nq"), _a.vmcall("mjc_neq")])
 	_say("right sandbox has no model at all")
@@ -52,18 +50,23 @@ func _ready() -> void:
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
+
+	# Top-left and only as wide as it needs to be, so the figure in the middle
+	# stays clear. Everything but the buttons ignores the mouse: a panel that
+	# spans the view swallows the drags meant for the balls behind it.
 	var panel := PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_left = 12
-	panel.offset_right = -12
-	panel.offset_top = -250
-	panel.offset_bottom = -12
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.position = Vector2(12, 12)
+	panel.custom_minimum_size = Vector2(520, 0)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(panel)
 
 	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(box)
 
 	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(row)
 	var buttons := [
 		["Snapshot left", _on_snapshot_pressed],
@@ -83,13 +86,16 @@ func _build_ui() -> void:
 
 	_status = RichTextLabel.new()
 	_status.bbcode_enabled = true
-	_status.custom_minimum_size = Vector2(0, 64)
+	_status.fit_content = true
+	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status.custom_minimum_size = Vector2(0, 60)
 	box.add_child(_status)
 
 	_log = RichTextLabel.new()
 	_log.bbcode_enabled = true
 	_log.scroll_following = true
-	_log.custom_minimum_size = Vector2(0, 120)
+	_log.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_log.custom_minimum_size = Vector2(0, 96)
 	box.add_child(_log)
 
 
@@ -106,35 +112,9 @@ func _make_sandbox() -> Object:
 	return sb
 
 
-## One capsule per rope segment. The world body at index 0 is skipped: it has no
-## geometry and sits at the origin.
-func _build_meshes(offset: Vector3, tint: Color) -> Array[MeshInstance3D]:
-	var mesh := CapsuleMesh.new()
-	mesh.radius = SEG_RADIUS
-	mesh.height = SEG_LENGTH + SEG_RADIUS * 2.0
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = tint
-	mat.roughness = 0.6
-
-	# MuJoCo is Z-up, Godot is Y-up. Rotating the holder a quarter turn about X
-	# converts both the positions and the orientations underneath it, so the
-	# guest keeps handing over MuJoCo coordinates untouched.
-	var holder := Node3D.new()
-	holder.position = offset
-	holder.rotation = Vector3(-PI / 2.0, 0, 0)
-	add_child(holder)
-
-	var out: Array[MeshInstance3D] = []
-	for i in range(24):
-		var mi := MeshInstance3D.new()
-		mi.mesh = mesh
-		mi.material_override = mat
-		mi.visible = false
-		holder.add_child(mi)
-		out.append(mi)
-	return out
-
-
+## The host owns the tick. Four steps a frame at a 0.2 ms timestep keeps the
+## collision stiff enough to read as elastic without the frame rate deciding
+## how fast the figure swings.
 func _process(_delta: float) -> void:
 	if _a == null:
 		return
@@ -143,30 +123,65 @@ func _process(_delta: float) -> void:
 			_a.vmcall("mjc_step")
 			if _b.vmcall("mjc_nq") > 0:
 				_b.vmcall("mjc_step")
-	_draw(_a, _a_meshes)
-	_draw(_b, _b_meshes)
+	_draw(_a, _a_holder)
+	_draw(_b, _b_holder)
 	_refresh_status()
 
 
-## MuJoCo hands back a capsule's body frame; Godot's CapsuleMesh stands along
-## +Y and the segments were authored along the body's local Z, so the mesh is
-## rotated a quarter turn to match.
-func _draw(sb: Object, meshes: Array[MeshInstance3D]) -> void:
-	if sb == null or sb.vmcall("mjc_nq") == 0:
-		for m in meshes:
-			m.visible = false
+## Meshes are built from the model's own geoms on first draw, so the host is
+## not told what the figure is made of. MuJoCo geom types: 2 sphere, 3 capsule.
+func _build_meshes(offset: Vector3, tint: Color) -> Node3D:
+	# MuJoCo is Z-up, Godot is Y-up. A quarter turn about X on the holder
+	# converts positions and orientations together, so the guest keeps handing
+	# over MuJoCo coordinates untouched.
+	var holder := Node3D.new()
+	holder.position = offset
+	holder.rotation = Vector3(-PI / 2.0, 0, 0)
+	add_child(holder)
+	holder.set_meta(&"tint", tint)
+	return holder
+
+
+func _mesh_for(g_type: int, sx: float, sy: float) -> Mesh:
+	if g_type == 2:
+		var s := SphereMesh.new()
+		s.radius = sx
+		s.height = sx * 2.0
+		return s
+	var c := CapsuleMesh.new()
+	c.radius = sx
+	# MuJoCo gives a capsule's half-length; Godot wants the whole height.
+	c.height = sy * 2.0 + sx * 2.0
+	return c
+
+
+func _draw(sb: Object, holder: Node3D) -> void:
+	if sb == null or holder == null:
 		return
-	var b: PackedFloat64Array = sb.vmcall("mjc_bodies")
-	var n := mini(meshes.size(), int(b.size() / 7) - 1)
+	if sb.vmcall("mjc_nq") == 0:
+		holder.visible = false
+		return
+	holder.visible = true
+	var g: PackedFloat64Array = sb.vmcall("mjc_geoms")
+	var n := int(g.size() / 11)
+	while holder.get_child_count() < n:
+		var mi := MeshInstance3D.new()
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = holder.get_meta(&"tint")
+		mat.roughness = 0.35
+		mat.metallic = 0.6
+		mi.material_override = mat
+		holder.add_child(mi)
 	for i in range(n):
-		var o := (i + 1) * 7
-		var t := Transform3D()
-		t.basis = Basis(Quaternion(b[o + 4], b[o + 5], b[o + 6], b[o + 3])) * Basis(Vector3(1, 0, 0), PI / 2.0)
-		t.origin = Vector3(b[o + 0], b[o + 1], b[o + 2])
-		meshes[i].transform = t
-		meshes[i].visible = true
-	for i in range(n, meshes.size()):
-		meshes[i].visible = false
+		var o := i * 11
+		var mi: MeshInstance3D = holder.get_child(i)
+		if mi.mesh == null:
+			mi.mesh = _mesh_for(int(g[o]), g[o + 1], g[o + 2])
+		var tr := Transform3D()
+		# A capsule stands along +Z in MuJoCo and +Y in Godot.
+		tr.basis = Basis(Quaternion(g[o + 8], g[o + 9], g[o + 10], g[o + 7])) * Basis(Vector3(1, 0, 0), PI / 2.0)
+		tr.origin = Vector3(g[o + 4], g[o + 5], g[o + 6])
+		mi.transform = tr
 
 
 func _refresh_status() -> void:
@@ -188,7 +203,10 @@ func _refresh_status() -> void:
 
 
 func _say(msg: String) -> void:
-	_log.text += msg + "\n"
+	# Also to stdout, so a headless run reports what the on-screen log would.
+	print(msg)
+	if _log != null:
+		_log.text += msg + "\n"
 
 
 ## Millimetres paired with something a reader can picture, because "4.3 mm"

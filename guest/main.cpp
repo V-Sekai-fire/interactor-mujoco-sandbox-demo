@@ -104,6 +104,16 @@ static bool load_xml_text(const char *text, int len) {
 		return false;
 	}
 	g_data = mj_makeData(g_model);
+	if (g_data != nullptr) {
+		// A keyframe opens the model in the middle of its motion rather than
+		// from rest. Without applying it the keyframe is data nothing reads.
+		if (g_model->nkey > 0) {
+			mj_resetDataKeyframe(g_model, g_data, 0);
+		}
+		// Positions are only valid once the kinematics have run; otherwise the
+		// first frame reports every geom at the origin.
+		mj_forward(g_model, g_data);
+	}
 	return g_data != nullptr;
 }
 
@@ -289,9 +299,11 @@ static Variant mjc_lowest_mm() {
 	if (g_model == nullptr || g_data == nullptr) {
 		return 0.0;
 	}
+	// Geoms, not bodies: a body frame sits at its joint, so measuring those
+	// reports the height of the beam the figure hangs from.
 	double lowest = 1e9;
-	for (int i = 1; i < g_model->nbody; i++) {
-		const double z = g_data->xpos[i * 3 + 2];
+	for (int i = 0; i < g_model->ngeom; i++) {
+		const double z = g_data->geom_xpos[i * 3 + 2];
 		if (z < lowest) {
 			lowest = z;
 		}
