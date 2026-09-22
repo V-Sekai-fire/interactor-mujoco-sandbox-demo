@@ -3,3 +3,6 @@ defaultTargets = ["SandboxMem"]
 
 [[lean_lib]]
 name = "SandboxMem"
+
+[[lean_lib]]
+name = "NewtonsCradle"

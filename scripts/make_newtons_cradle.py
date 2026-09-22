@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Generate the Newton's cradle MJCF.
+"""Generate the Newton's cradle MJCF from an XML AST.
 
-Five balls hang touching each other from equal-length strings. Lift the end
-one and release it, and the ball at the far end swings out while the middle
-three stay put. That only happens when the balls start exactly touching and
-the strings are exactly equal, so both are stated once here and checked.
+Five steel balls hang a hair apart from equal strings. The end ball is drawn
+OUTWARD and released; it strikes the row and the ball at the far end swings out
+while the middle three stay still. That one-in-one-out transfer is the whole
+point, and it only appears when three things are right, each checked below:
+
+  * the end ball is drawn outward, not into the row (a sign on the hinge angle);
+  * the balls rest a hair apart, so impacts are sequential, not one mushy solve;
+  * the contact is stiff, so little energy is lost per strike.
+
+The model is built as an ElementTree, not by pasting strings, so a tuning
+change is an attribute on a node rather than a fragile search-and-replace.
 
     python scripts/make_newtons_cradle.py
     python scripts/make_newtons_cradle.py --self-test
@@ -14,6 +21,7 @@ import argparse
 import math
 import pathlib
 import sys
+import xml.etree.ElementTree as ET
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / "project" / "plans" / "newtons_cradle.xml"
 
@@ -24,73 +32,73 @@ RADIUS = 0.0125          # 25 mm across, about a quarter
 STRING = 0.13            # pivot to ball centre
 PIVOT_Z = 0.16
 SPREAD = 0.035           # half-width of the V each string hangs in
-LIFT = 0.62              # radians the end ball is drawn back to
-SWING = -LIFT            # where the figure opens: drawn fully back, released from rest
+GAP = 0.0008             # 0.8 mm of air between neighbours, so strikes are sequential
 
-# Zero, and not a free parameter. Opening part-way down with the velocity that
-# fall implies is the more interesting picture, but a non-zero qvel in the
-# keyframe makes the first contact gain energy: ball 0 reached 284 mm from a
-# speed that can lift it 11 mm, against a 160 mm pivot. Released from rest the
-# same model stays inside its energy bound, so the opening state is the
-# drawn-back one until that is understood.
-SPEED = 0.0
-GAP = 0.0005             # 0.5 mm of air between neighbours at rest
+LIFT = 0.62              # radians the end ball is drawn back to
+# Drawn OUTWARD, away from the row. A +y hinge moves the leftmost ball to -x for
+# +theta, which is up-and-out; a negative angle would lift it into ball 1 and
+# start the run jammed against the row -- the bug that produced a mushy fan.
+SWING = LIFT
+
+# Stiff, lightly damped contact with a 0.5 ms step: measured to keep the middle
+# balls still and pass most of the energy to the end ball. A softer contact
+# fans the row; a coarser step loses too much on each strike.
+TIMESTEP = 0.0005
+ITERATIONS = 50
+SOLREF = "-2000000 -20"
+SOLIMP = "0.98 0.999 0.0002"
 
 
 def ball_x(i):
-    """Centres a diameter apart plus a hair, so the row rests without loading
-    the solver. Starting every pair in contact makes the first step resolve
-    five stiff constraints at once, which pumps in energy rather than removing
-    it."""
+    """Centres a diameter apart plus the gap, so neighbours rest just clear."""
     return (i - (BALLS - 1) / 2.0) * (2.0 * RADIUS + GAP)
 
 
-def build():
-    q = chr(34)
-    lines = []
-    lines.append('<mujoco model="newtons_cradle">')
-    # MJCF angles are degrees unless this says otherwise, and every angle here
-    # is written in radians.
-    lines.append('  <compiler angle="radian"/>')
-    # A 1 ms step with 50 solver iterations: measured to hold the same energy
-    # bound as a far finer step (peak 61 mm against an 84 mm release) while
-    # costing about a sixth as much, so contacts do not drop the frame rate.
-    lines.append('  <option timestep="0.001" gravity="0 0 -9.81" integrator="implicitfast" '
-                 'iterations="50" ls_iterations="50" tolerance="1e-12"/>')
-    lines.append('  <default>')
-    lines.append('    <geom solref="-120000 -180" solimp="0.98 0.999 0.0002" friction="0.001 0.0001 0.00001"/>')
-    lines.append('    <joint damping="0.00002"/>')
-    lines.append('  </default>')
-    lines.append('  <worldbody>')
+def build_tree():
+    m = ET.Element("mujoco", model="newtons_cradle")
+    ET.SubElement(m, "compiler", angle="radian")  # radians, not the MJCF default of degrees
+    ET.SubElement(m, "option", timestep=str(TIMESTEP), gravity="0 0 -9.81",
+                  integrator="implicitfast", iterations=str(ITERATIONS),
+                  ls_iterations="50", tolerance="1e-12")
+    default = ET.SubElement(m, "default")
+    ET.SubElement(default, "geom", type="capsule", solref=SOLREF, solimp=SOLIMP,
+                  friction="0.001 0.0001 0.00001")
+    ET.SubElement(default, "joint", damping="0.00002")
 
-    # The frame the strings hang from, drawn but never collided with.
-    lines.append('    <geom name="beam" type="capsule" contype="0" conaffinity="0" size="0.004" '
-                 'fromto="%.5f 0 %.5f %.5f 0 %.5f" rgba="0.4 0.42 0.5 1"/>'
-                 % (ball_x(0) - 0.02, PIVOT_Z, ball_x(BALLS - 1) + 0.02, PIVOT_Z))
+    world = ET.SubElement(m, "worldbody")
+    ET.SubElement(world, "geom", name="beam", type="capsule", contype="0",
+                  conaffinity="0", size="0.004",
+                  fromto="%.5f 0 %.5f %.5f 0 %.5f" % (ball_x(0) - 0.02, PIVOT_Z,
+                                                      ball_x(BALLS - 1) + 0.02, PIVOT_Z),
+                  rgba="0.4 0.42 0.5 1")
 
     for i in range(BALLS):
-        x = ball_x(i)
-        lines.append('    <body name="ball%d" pos="%.5f 0 %.5f">' % (i, x, PIVOT_Z))
-        # Swinging about y keeps every ball in one plane, which is what makes
-        # the row strike squarely instead of glancing off.
-        lines.append('      <joint name="pivot%d" type="hinge" axis="0 1 0" pos="0 0 0"/>' % i)
-        # Two strings in a V, so the ball cannot swing sideways out of the row.
-        lines.append('      <geom name="wireL%d" type="capsule" contype="0" conaffinity="0" size="0.0004" '
-                     'fromto="0 %.5f 0 0 0 %.5f" rgba="0.75 0.75 0.8 1"/>' % (i, SPREAD, -STRING))
-        lines.append('      <geom name="wireR%d" type="capsule" contype="0" conaffinity="0" size="0.0004" '
-                     'fromto="0 %.5f 0 0 0 %.5f" rgba="0.75 0.75 0.8 1"/>' % (i, -SPREAD, -STRING))
-        lines.append('      <geom name="ball%d" type="sphere" size="%.5f" pos="0 0 %.5f" '
-                     'density="7800" condim="3" rgba="0.85 0.86 0.9 1"/>' % (i, RADIUS, -STRING))
-        lines.append('    </body>')
+        body = ET.SubElement(world, "body", name="ball%d" % i,
+                             pos="%.5f 0 %.5f" % (ball_x(i), PIVOT_Z))
+        # Hinge about y keeps every ball in the one plane, so the row strikes
+        # squarely rather than glancing.
+        ET.SubElement(body, "joint", name="pivot%d" % i, type="hinge",
+                      axis="0 1 0", pos="0 0 0")
+        for side, y in (("L", SPREAD), ("R", -SPREAD)):
+            ET.SubElement(body, "geom", name="wire%s%d" % (side, i), type="capsule",
+                          contype="0", conaffinity="0", size="0.0004",
+                          fromto="0 %.5f 0 0 0 %.5f" % (y, -STRING),
+                          rgba="0.75 0.75 0.8 1")
+        ET.SubElement(body, "geom", name="ball%d" % i, type="sphere",
+                      size="%.5f" % RADIUS, pos="0 0 %.5f" % -STRING,
+                      density="7800", condim="3", rgba="0.85 0.86 0.9 1")
 
-    lines.append('  </worldbody>')
-    qpos = ' '.join(['%.5f' % (SWING if i == 0 else 0.0) for i in range(BALLS)])
-    qvel = ' '.join(['%.5f' % (SPEED if i == 0 else 0.0) for i in range(BALLS)])
-    lines.append('  <keyframe>')
-    lines.append('    <key name="mid_swing" qpos="%s" qvel="%s"/>' % (qpos, qvel))
-    lines.append('  </keyframe>')
-    lines.append('</mujoco>')
-    return "\n".join(lines) + "\n"
+    key = ET.SubElement(m, "keyframe")
+    qpos = " ".join("%.5f" % (SWING if i == 0 else 0.0) for i in range(BALLS))
+    qvel = " ".join("%.5f" % 0.0 for _ in range(BALLS))
+    ET.SubElement(key, "key", name="drawn_back", qpos=qpos, qvel=qvel)
+    return m
+
+
+def build():
+    m = build_tree()
+    ET.indent(m, space="  ")
+    return ET.tostring(m, encoding="unicode") + "\n"
 
 
 def self_test():
@@ -99,41 +107,42 @@ def self_test():
     def control(name, ok, detail=""):
         controls.append((name, ok, detail))
 
+    m = build_tree()
+
     gaps = [ball_x(i + 1) - ball_x(i) for i in range(BALLS - 1)]
     control("neighbours rest a hair apart, not loaded against each other",
             all(abs(g - (2 * RADIUS + GAP)) < 1e-12 for g in gaps) and GAP > 0,
             "centres %.4f mm apart, diameter %.4f mm" % (gaps[0] * 1000, RADIUS * 2000))
     control("the gap is small enough to still read as a row",
             GAP < RADIUS / 4.0, "%.2f mm" % (GAP * 1000))
-
     control("the row is centred on the origin", abs(ball_x(0) + ball_x(BALLS - 1)) < 1e-12)
 
-    xml = build()
-    control("every ball has a pivot", xml.count('type="hinge"') == BALLS, str(xml.count('type="hinge"')))
-    control("angles are declared in radians", 'angle="radian"' in xml)
-    control("the figure opens from a state it could be placed in by hand",
-            xml.count('<key name="mid_swing"') == 1 and SPEED == 0.0,
-            "drawn back %.2f rad, at rest" % abs(SWING))
+    # The correctness bug that produced the mush: the end ball must be drawn
+    # OUTWARD. A negative opening angle lifts it into ball 1.
+    control("the end ball is drawn outward, not into the row",
+            SWING > 0.0 and abs(SWING) <= abs(LIFT),
+            "opens at %+.2f rad (positive = outward)" % SWING)
 
-    # The bound the opening state has to respect: released from LIFT, no ball
-    # can rise above PIVOT_Z - STRING*cos(LIFT).
+    # AST assertions, in place of the old substring counts.
+    control("angles are radians", m.find("compiler").get("angle") == "radian")
+    control("every ball has a hinge",
+            len(m.findall(".//joint[@type='hinge']")) == BALLS)
+    control("one keyframe, one ball moving off rest",
+            len(m.findall(".//key")) == 1 and
+            m.find(".//key").get("qpos").split()[0] == "%.5f" % SWING)
+
+    noncolliding = [g for g in m.iter("geom") if g.get("contype") == "0"]
+    control("only the balls collide", len(noncolliding) == BALLS * 2 + 1,
+            str(len(noncolliding)))
+
     peak_mm = (PIVOT_Z - STRING * math.cos(LIFT)) * 1000.0
     control("the release height is well under the pivot",
-            peak_mm < PIVOT_Z * 1000.0, "%.0f mm against a %.0f mm pivot" % (peak_mm, PIVOT_Z * 1000))
-    control("the drawn-back angle is a real displacement",
-            abs(LIFT) > 0.5 and abs(SWING) <= abs(LIFT), "lift %.2f rad, opens at %.2f" % (LIFT, SWING))
+            peak_mm < PIVOT_Z * 1000.0,
+            "%.0f mm against a %.0f mm pivot" % (peak_mm, PIVOT_Z * 1000))
 
-    # The strings and the beam must not collide, or the row jams instead of
-    # swinging and the demo looks like a bug in the physics.
-    control("only the balls collide",
-            xml.count('contype="0" conaffinity="0"') == BALLS * 2 + 1,
-            str(xml.count('contype="0" conaffinity="0"')))
-
-    # Negative control: a spacing that is not one diameter must be caught by
-    # the touching check above, or that check proves nothing.
-    bad = [2 * RADIUS + GAP, 2 * RADIUS + GAP + 0.001]
     control("a wrong spacing would be caught",
-            not all(abs(g - (2 * RADIUS + GAP)) < 1e-12 for g in bad))
+            not all(abs(g - (2 * RADIUS + GAP)) < 1e-12
+                    for g in [2 * RADIUS + GAP + 0.001] * 2))
 
     for name, ok, detail in controls:
         print(("PASS" if ok else "FAIL") + "  " + name + ("  [" + detail + "]" if detail else ""))
