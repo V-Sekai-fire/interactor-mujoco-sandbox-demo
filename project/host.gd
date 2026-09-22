@@ -183,7 +183,7 @@ func _draw(sb: Object, holder: Node3D) -> void:
 		return
 	holder.visible = true
 	var g: PackedFloat64Array = sb.vmcall("mjc_geoms")
-	var n := int(g.size() / 11)
+	var n := int(g.size() / 11.0)
 	var meshes: Array = holder.get_meta(&"meshes")
 	while meshes.size() < n:
 		var mi := MeshInstance3D.new()
@@ -199,15 +199,15 @@ func _draw(sb: Object, holder: Node3D) -> void:
 		var mi: MeshInstance3D = meshes[i]
 		if mi.mesh == null:
 			mi.mesh = _mesh_for(int(g[o]), g[o + 1], g[o + 2])
-		var tr := Transform3D()
+		var xform := Transform3D()
 		# A capsule stands along +Z in MuJoCo and +Y in Godot.
-		tr.basis = Basis(Quaternion(g[o + 8], g[o + 9], g[o + 10], g[o + 7])) * Basis(Vector3(1, 0, 0), PI / 2.0)
-		tr.origin = Vector3(g[o + 4], g[o + 5], g[o + 6])
-		mi.transform = tr
+		xform.basis = Basis(Quaternion(g[o + 8], g[o + 9], g[o + 10], g[o + 7])) * Basis(Vector3(1, 0, 0), PI / 2.0)
+		xform.origin = Vector3(g[o + 4], g[o + 5], g[o + 6])
+		mi.transform = xform
 		if holder == _a_holder:
 			var ball := _sphere_rank(g, i)
 			if ball >= 0 and ball < _ball_nodes.size():
-				_ball_nodes[ball].position = tr.origin
+				_ball_nodes[ball].position = xform.origin
 				var m: StandardMaterial3D = mi.material_override
 				var lit := ball == _hovered or ball == _grabbed
 				m.emission_enabled = lit
@@ -225,7 +225,7 @@ func _register_balls() -> void:
 	if g.is_empty():
 		return
 	_lasso = LassoScript.new()
-	for i in range(int(g.size() / 11)):
+	for i in range(int(g.size() / 11.0)):
 		if int(g[i * 11]) != 2:      # spheres are the balls
 			continue
 		var n := Node3D.new()
@@ -286,7 +286,10 @@ func _hold(index: int, screen_pos: Vector2) -> void:
 	var pz := _pivots[index * 3 + 1]
 	var p := _pointer_in_model(screen_pos)
 	_a.vmcall("mjc_select", index)
-	_a.vmcall("mjc_hold", atan2(p.x - px, pz - p.z))
+	# A +y hinge puts the ball at ball_x - px = -L*sin(theta), so the angle that
+	# lands it under the pointer is atan2(px - p.x, ...). Writing p.x - px flips
+	# it, and the ball chases the pointer the wrong way.
+	_a.vmcall("mjc_hold", atan2(px - p.x, pz - p.z))
 
 
 ## Which ball a geom is, counting only spheres.
@@ -332,12 +335,12 @@ func _mm(v: float) -> String:
 		"a golf ball": 42.7, "an adult wrist": 57.0, "a soda can": 66.0}
 	var best := ""
 	var best_err := INF
-	for name in anchors:
-		var k: float = absf(v) / float(anchors[name])
+	for anchor_name in anchors:
+		var k: float = absf(v) / float(anchors[anchor_name])
 		var err: float = absf(k - roundf(k))
 		if k >= 0.8 and err < best_err:
 			best_err = err
-			best = "%.1f x %s" % [k, name]
+			best = "%.1f x %s" % [k, anchor_name]
 	return "%.0f mm (%s)" % [v, best] if best != "" else "%.0f mm" % v
 
 
