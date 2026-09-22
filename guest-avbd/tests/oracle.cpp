@@ -1,9 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-// Native oracle for AvbdCpu. Reproduces the hand-computed fixtures from
-// cloth-dynamics tests/test_avbd_solver.cpp (4 verts, all four constraint
-// types) and test_avbd_inverse_design.cpp (2 verts, spring only). A driver
-// that fails these is not measured; the perturbation control asserts the
-// check can fail.
 
 #include <cmath>
 #include <cstdint>
@@ -101,9 +96,6 @@ static void run_two_vertex() {
 	std::vector<float> out;
 	s.readPositions(out);
 
-	// One AVBD iteration with a finite-stiffness pin: v0's residual is
-	// Δx = spring_force / H = 50 / (100 + 1000 + 50) ≈ 0.0435, small against
-	// v1's 0.4 travel. v1 is pulled from 2.0 toward rest 1.0.
 	const bool v0_pinned = std::fabs(out[0]) < 0.1f;
 	const bool v1_moved = out[3] < 2.0f && out[3] > 1.0f;
 	const bool ok = v0_pinned && v1_moved;

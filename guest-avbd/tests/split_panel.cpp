@@ -1,11 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-// One connected panel, split across cores. split_connected_panel() cuts a
-// single cloth into vertical tiles with a ghost halo; each tile solves only
-// its owned vertices while reading its neighbours' boundary as fixed ghosts,
-// and the tiles exchange once per substep. This is deterministic additive
-// Schwarz: the whole cloth spreads over N threads (as N sandboxes would),
-// the result does not depend on the thread schedule, and it drapes like the
-// monolithic solve.
 
 #include <chrono>
 #include <cmath>
@@ -44,7 +37,6 @@ struct Tile {
 	}
 };
 
-// Solve a decomposed panel. Returns the final global positions.
 std::vector<float> run_decomposed(uint32_t nTiles, bool parallel, double *outMs) {
 	ClothMesh panel = build_cloth_mesh(NX, NY, 0.5f, 0.7f, 1.2f, 0.05f);
 	const uint32_t nV = panel.nVerts();
@@ -159,8 +151,6 @@ int main() {
 			drape_ok ? "PASS" : "FAIL", sag * 1000.0f, sag / 0.0427f);
 	fails += drape_ok ? 0 : 1;
 
-	// One tile is the monolithic solve; compare the drape depth so the
-	// decomposition is not silently producing a different cloth.
 	std::vector<float> mono = run_decomposed(1, false, nullptr);
 	const float monoSag = 1.2f - lowest_y(mono);
 	const float rel = std::fabs(sag - monoSag) / monoSag;

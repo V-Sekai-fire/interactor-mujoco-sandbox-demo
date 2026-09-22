@@ -1,11 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-// Independent sub-islands on many cores. Several panels are concatenated into
-// one mesh, then partition_islands() recovers the connected components. Each
-// component is a fully independent sub-island: solving it in a thread pool (as
-// N sandbox instances would on Godot's WorkerThreadPool) gives byte-for-byte
-// the same result as solving the original standalone panel. Partitioning is
-// exact and parallelism does not change the answer, because the islands never
-// share state.
 
 #include <chrono>
 #include <cstdint>
@@ -41,7 +34,6 @@ int main() {
 		panels.push_back(panel(i));
 	}
 
-	// Reference: each panel solved standalone, serially.
 	auto t0 = std::chrono::steady_clock::now();
 	std::vector<uint64_t> standalone(NUM_PANELS);
 	for (int i = 0; i < NUM_PANELS; ++i) {
@@ -50,7 +42,6 @@ int main() {
 	auto t1 = std::chrono::steady_clock::now();
 	const double serialMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
-	// Combine into one mesh, then recover the independent sub-islands.
 	ClothMesh combined = combine_meshes(panels);
 	std::vector<ClothMesh> islands = partition_islands(combined);
 
@@ -59,7 +50,6 @@ int main() {
 			count_ok ? "PASS" : "FAIL", islands.size(), NUM_PANELS);
 	fails += count_ok ? 0 : 1;
 
-	// Solve the islands in parallel, one thread each.
 	std::vector<uint64_t> par(islands.size(), 0);
 	std::vector<std::thread> pool;
 	auto t2 = std::chrono::steady_clock::now();

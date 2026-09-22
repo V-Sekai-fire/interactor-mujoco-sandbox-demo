@@ -8,13 +8,7 @@
 #include "avbd_cpu.h"
 #include "cloth_grid.h"
 
-// One AVBD cloth island: an AvbdCpu solver plus the time-integration state
-// for a single panel. Each island is independent, so a whole panel runs on
-// one thread / one sandbox instance and N of them fill N cores. The solver
-// configuration is fixed here on purpose — no runtime knobs — so a run is a
-// property of the mesh and the step count alone.
 struct ClothSim {
-	// Committed solver configuration.
 	static constexpr float H = 5e-3f;        // substep, 5 ms
 	static constexpr int ITERS = 40;         // AVBD outer iterations per substep
 	static constexpr float MEMBRANE_K = 2.0f;
@@ -27,13 +21,8 @@ struct ClothSim {
 	std::vector<float> pos, vel, predicted;
 	std::vector<float> triK, bendK, attachK;
 
-	// Outer iterations per substep. Defaults to the committed ITERS; a
-	// realtime demo can lower it to trade drape depth for speed.
 	int iters = ITERS;
 
-	// Interactive drag: a temporary attachment appended to the base pin set.
-	// Untouched by the default sim, so the determinism path is unaffected
-	// until grab() is called.
 	int grabbed = -1;
 	std::vector<uint32_t> dragAttachVert;
 	std::vector<float> dragAttachFixed, dragAttachK;
@@ -81,8 +70,6 @@ struct ClothSim {
 		}
 	}
 
-	// Pin vertex v to a drag anchor at its current position (no jump). One
-	// re-upload per click, not per frame.
 	void grab(int v) {
 		if (v < 0 || uint32_t(v) >= mesh.nVerts()) {
 			return;
@@ -100,7 +87,6 @@ struct ClothSim {
 				dragAttachFixed.data(), dragAttachK.data());
 	}
 
-	// Move the grabbed anchor. Rewrites anchor positions only — no realloc.
 	void drag(float x, float y, float z) {
 		if (grabbed < 0 || dragAttachVert.empty()) {
 			return;
@@ -112,7 +98,6 @@ struct ClothSim {
 		solver.updateAttachmentFixedPos(dragAttachFixed.data());
 	}
 
-	// Drop the grabbed vertex and restore the original pin set.
 	void release() {
 		grabbed = -1;
 		solver.uploadAttachments(mesh.nAttach(), mesh.attachVert.data(),
@@ -120,7 +105,6 @@ struct ClothSim {
 	}
 };
 
-// FNV-1a digest of a float buffer; the determinism check compares these.
 inline uint64_t avbd_digest(const std::vector<float> &v) {
 	uint64_t h = 1469598103934665603ull;
 	const unsigned char *b = reinterpret_cast<const unsigned char *>(v.data());

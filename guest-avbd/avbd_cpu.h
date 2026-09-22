@@ -5,9 +5,6 @@
 #include <cstdint>
 #include <vector>
 
-// Portable CPU AVBD driver. Host-side transcription of AvbdSolver.mm's
-// setupMesh / upload* / step / stepDual*, calling the slangc -target cpp
-// kernels instead of Metal. Exception-free; vec3 buffers are tight 3-float.
 class AvbdCpu {
 public:
 	void setupMesh(uint32_t nVerts, const float *positions, const float *predicted,
@@ -21,10 +18,6 @@ public:
 	void uploadBendings(uint32_t nBend, const uint32_t *bendIdx, const float *weight,
 			const float *nTarget, const float *stiffness);
 
-	// Greedy first-fit vertex coloring over the constraint graph. Turns the
-	// per-color sweep into Gauss-Seidel, which converges far faster than the
-	// default single-color Jacobi and gives the independent blocks that a
-	// per-island sandbox can own.
 	void buildColoring();
 
 	void setGammaScale(float scale);
@@ -36,10 +29,6 @@ public:
 	int stepDualMembrane();
 	int stepDualBending();
 
-	// Restrict the solved set to the first `nOwned` vertices; the trailing
-	// vertices become fixed ghosts (read by force kernels, never updated).
-	// This is what lets one connected panel be split across tiles: each tile
-	// owns its interior and holds its neighbours' boundary as ghosts.
 	void restrictToOwned(uint32_t nOwned);
 	void setPositions(const float *positions);
 
@@ -52,7 +41,6 @@ private:
 	float invHSq_ = 0.0f;
 	bool meshReady_ = false;
 
-	// Per-vertex state. positions/predicted/gScratch are tight 3-float vec3.
 	std::vector<float> positions_, predicted_, gScratch_, mass_, hScratch_;
 	std::vector<uint32_t> vertPerm_, colorOffsets_{ 0u, 0u };
 
@@ -76,4 +64,4 @@ private:
 	std::vector<uint32_t> vBendOff_, vBendIdx_, vBendRole_;
 };
 
-#endif // AVBD_CPU_H
+#endif

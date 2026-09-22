@@ -1,9 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-// End-to-end AVBD drape: an FEM cloth panel (membrane + bending + AL pins)
-// hangs from its two pinned corners under gravity, solved by the Slang kernels
-// via AvbdCpu. Asserts the pins hold, the cloth sags, and the solve is
-// bit-identical run to run (the determinism claim). A gravity-perturbed
-// control asserts the digest actually moves.
 
 #include <cmath>
 #include <cstdint>
@@ -26,8 +21,6 @@ Result simulate(float gravityScale) {
 	const uint32_t nx = 10, ny = 14;
 	ClothSim sim;
 	sim.setup(build_cloth_mesh(nx, ny, 0.5f, 0.7f, 1.2f, 0.05f));
-	// A gravity perturbation for the negative control: nudge the predictor's
-	// vertical term without touching the committed solver config.
 	for (int s = 0; s < SUBSTEPS; ++s) {
 		const uint32_t nV = sim.mesh.nVerts();
 		for (uint32_t i = 0; i < nV; ++i) {
