@@ -26,6 +26,10 @@ script/skip=true
 
 enabled=PackedStringArray("res://addons/godot_sandbox/plugin.cfg", "res://addons/vsekai_godot_mcp/plugin.cfg", "res://addons/canvas_plane/plugin.cfg", "res://addons/interaction_system/plugin.cfg")
 
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
+
 [sandbox]
 
 toolchain/skip_dependency_check=true

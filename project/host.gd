@@ -26,6 +26,17 @@ var _snapshot := PackedByteArray()
 var _status: RichTextLabel
 var _log: RichTextLabel
 
+# Snapping comes from the interaction system's LassoDB rather than a raycast:
+# it scores every candidate against the ray, so an imprecise aim still picks
+# the ball the pointer is nearest to.
+const LassoScript := preload("res://addons/interaction_system/lassodb.gd")
+var _lasso = null
+var _ball_points := []          # LassoPoint per ball, index is the joint index
+var _ball_nodes: Array[Node3D] = []
+var _hovered := -1
+var _grabbed := -1
+var _pivots: PackedFloat64Array = PackedFloat64Array()
+
 
 func _ready() -> void:
 	_build_ui()
@@ -40,6 +51,7 @@ func _ready() -> void:
 
 	_a_holder = _build_meshes(Vector3(-0.09, 0, 0), Color(0.93, 0.80, 0.42))
 	_b_holder = _build_meshes(Vector3(0.09, 0, 0), Color(0.55, 0.78, 0.96))
+	_pivots = _a.vmcall("mjc_pivots")
 	_say("left sandbox loaded the figure: nq=%d, %d equality constraints" % [
 		_a.vmcall("mjc_nq"), _a.vmcall("mjc_neq")])
 	_say("right sandbox has no model at all")
@@ -109,6 +121,10 @@ func _make_sandbox() -> Object:
 	# defaults are sized for a script. Raised after load, which resets them.
 	sb.set_memory_max(1024)
 	sb.set_allocations_max(1 << 21)
+	# Arguments reach the guest in registers rather than as Variant pointers,
+	# which is what the guest's typed parameters expect. With this off a typed
+	# parameter reads the pointer as a number and answers with garbage.
+	sb.set_unboxed_arguments(true)
 	return sb
 
 
@@ -123,6 +139,7 @@ func _process(_delta: float) -> void:
 			_a.vmcall("mjc_step")
 			if _b.vmcall("mjc_nq") > 0:
 				_b.vmcall("mjc_step")
+	_register_balls()
 	_draw(_a, _a_holder)
 	_draw(_b, _b_holder)
 	_refresh_status()
@@ -139,6 +156,9 @@ func _build_meshes(offset: Vector3, tint: Color) -> Node3D:
 	holder.rotation = Vector3(-PI / 2.0, 0, 0)
 	add_child(holder)
 	holder.set_meta(&"tint", tint)
+	# Kept explicitly: the holder also carries the pointing anchors, so child
+	# order stopped being the geom index the moment those were added.
+	holder.set_meta(&"meshes", [])
 	return holder
 
 
@@ -164,7 +184,8 @@ func _draw(sb: Object, holder: Node3D) -> void:
 	holder.visible = true
 	var g: PackedFloat64Array = sb.vmcall("mjc_geoms")
 	var n := int(g.size() / 11)
-	while holder.get_child_count() < n:
+	var meshes: Array = holder.get_meta(&"meshes")
+	while meshes.size() < n:
 		var mi := MeshInstance3D.new()
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = holder.get_meta(&"tint")
@@ -172,9 +193,10 @@ func _draw(sb: Object, holder: Node3D) -> void:
 		mat.metallic = 0.6
 		mi.material_override = mat
 		holder.add_child(mi)
+		meshes.append(mi)
 	for i in range(n):
 		var o := i * 11
-		var mi: MeshInstance3D = holder.get_child(i)
+		var mi: MeshInstance3D = meshes[i]
 		if mi.mesh == null:
 			mi.mesh = _mesh_for(int(g[o]), g[o + 1], g[o + 2])
 		var tr := Transform3D()
@@ -182,6 +204,100 @@ func _draw(sb: Object, holder: Node3D) -> void:
 		tr.basis = Basis(Quaternion(g[o + 8], g[o + 9], g[o + 10], g[o + 7])) * Basis(Vector3(1, 0, 0), PI / 2.0)
 		tr.origin = Vector3(g[o + 4], g[o + 5], g[o + 6])
 		mi.transform = tr
+		if holder == _a_holder:
+			var ball := _sphere_rank(g, i)
+			if ball >= 0 and ball < _ball_nodes.size():
+				_ball_nodes[ball].position = tr.origin
+				var m: StandardMaterial3D = mi.material_override
+				var lit := ball == _hovered or ball == _grabbed
+				m.emission_enabled = lit
+				m.emission = Color(1.0, 0.95, 0.7)
+				m.emission_energy_multiplier = 1.6 if ball == _grabbed else 0.7
+
+
+## One lasso point per ball, anchored to a node the draw loop keeps on the
+## ball. Registered on the first frame that has geometry, because the ball
+## count comes from the model rather than from here.
+func _register_balls() -> void:
+	if _lasso != null or _a_holder == null:
+		return
+	var g: PackedFloat64Array = _a.vmcall("mjc_geoms")
+	if g.is_empty():
+		return
+	_lasso = LassoScript.new()
+	for i in range(int(g.size() / 11)):
+		if int(g[i * 11]) != 2:      # spheres are the balls
+			continue
+		var n := Node3D.new()
+		_a_holder.add_child(n)
+		_ball_nodes.append(n)
+		var pt = LassoScript.LassoPoint.new()
+		# A ball's own radius: the pointer has to fall within the ball to count
+		# as aimed straight at it.
+		pt.size = g[i * 11 + 1]
+		pt.register_point(_lasso, n)
+		_ball_points.append(pt)
+	_say("%d balls registered for pointing" % _ball_points.size())
+
+
+## Where the pointer is, in the model's own coordinates: the camera ray met
+## with the plane the figure swings in.
+func _pointer_in_model(screen_pos: Vector2) -> Vector3:
+	var cam := get_viewport().get_camera_3d()
+	var inv := _a_holder.global_transform.affine_inverse()
+	var o: Vector3 = inv * cam.project_ray_origin(screen_pos)
+	var d: Vector3 = inv.basis * cam.project_ray_normal(screen_pos)
+	if absf(d.y) < 1e-6:
+		return Vector3.ZERO
+	return o + d * (-o.y / d.y)
+
+
+func _input(event: InputEvent) -> void:
+	if _lasso == null:
+		return
+	var mm := event as InputEventMouseMotion
+	if mm != null:
+		var cam := get_viewport().get_camera_3d()
+		var q = LassoScript.LassoQuery.new()
+		q.set_source(cam.project_ray_origin(mm.position), cam.project_ray_normal(mm.position))
+		_lasso.query(q)
+		_hovered = _ball_points.find(q.out_best_poi)
+		if _grabbed >= 0:
+			_hold(_grabbed, mm.position)
+		return
+	var mb := event as InputEventMouseButton
+	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
+		if mb.pressed:
+			_grabbed = _hovered
+			if _grabbed >= 0:
+				_say("holding ball %d" % (_grabbed + 1))
+		else:
+			if _grabbed >= 0:
+				_say("released ball %d" % (_grabbed + 1))
+			_grabbed = -1
+
+
+## A held ball follows the pointer around its own pivot. The angle is the one
+## the pivot and the pointer imply, so the string stays the length it is.
+func _hold(index: int, screen_pos: Vector2) -> void:
+	if index * 3 + 2 >= _pivots.size():
+		return
+	var px := _pivots[index * 3 + 0]
+	var pz := _pivots[index * 3 + 1]
+	var p := _pointer_in_model(screen_pos)
+	_a.vmcall("mjc_select", index)
+	_a.vmcall("mjc_hold", atan2(p.x - px, pz - p.z))
+
+
+## Which ball a geom is, counting only spheres.
+func _sphere_rank(g: PackedFloat64Array, geom_index: int) -> int:
+	if int(g[geom_index * 11]) != 2:
+		return -1
+	var rank := 0
+	for k in range(geom_index):
+		if int(g[k * 11]) == 2:
+			rank += 1
+	return rank
 
 
 func _refresh_status() -> void:

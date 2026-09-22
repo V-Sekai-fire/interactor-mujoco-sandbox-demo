@@ -12,6 +12,12 @@
 
 #include "model_data.h"
 
+// Arguments are declared as native types, not Variant. The host unboxes them
+// into registers when unboxed arguments are on, and a Variant parameter then
+// faults on entry. Under the boxed ABI it is the other way round, and a typed
+// parameter reads the argument pointer as an integer and returns garbage
+// without complaining, which is the worse of the two failures.
+//
 // A physics guest: MuJoCo linked into a sandbox program, running a cat's
 // cradle. The host steps it one frame at a time, so the tick rate belongs to
 // the caller and a run can be replayed rather than raced.
@@ -51,9 +57,8 @@ static Variant mjc_version() {
 	return (int)mj_version();
 }
 
-static Variant mjc_load(Variant bytes) {
-	PackedArray<uint8_t> arr = bytes.as_byte_array();
-	const std::vector<uint8_t> v = arr.fetch();
+static Variant mjc_load(PackedArray<uint8_t> mjb) {
+	const std::vector<uint8_t> v = mjb.fetch();
 	if (v.empty()) {
 		return false;
 	}
@@ -127,8 +132,8 @@ static Variant mjc_load_builtin() {
 
 // Kept so the host-to-guest path stays exercised once it works again; deleting
 // it would hide that it is still broken.
-static Variant mjc_load_xml(Variant text) {
-	const std::vector<uint8_t> v = text.as_byte_array().fetch();
+static Variant mjc_load_xml(PackedArray<uint8_t> xml) {
+	const std::vector<uint8_t> v = xml.fetch();
 	if (v.empty()) {
 		return false;
 	}
@@ -242,19 +247,29 @@ static Variant mjc_ngeom() {
 	return g_model == nullptr ? 0 : (int)g_model->ngeom;
 }
 
-// Hold one hinge at an angle, as a hand holding a ball does: the joint is
-// placed and its velocity cleared, so releasing it starts from rest rather
-// than from whatever the solver had accumulated.
-static Variant mjc_hold(Variant index, Variant angle) {
-	if (g_model == nullptr || g_data == nullptr) {
+// Which hinge a later mjc_hold applies to. Split from the angle because a
+// two-Variant guest function faults on the way in; one argument each works.
+static int g_held = -1;
+
+static Variant mjc_select(int index) {
+	const int i = index;
+	if (g_model == nullptr || i < -1 || i >= g_model->nq) {
+		g_held = -1;
 		return false;
 	}
-	const int i = (int)(int64_t)index;
-	if (i < 0 || i >= g_model->nq) {
+	g_held = i;
+	return true;
+}
+
+// Hold the selected hinge at an angle, as a hand holding a ball does: the
+// joint is placed and its velocity cleared, so releasing it starts from rest
+// rather than from whatever the solver had accumulated.
+static Variant mjc_hold(double angle) {
+	if (g_model == nullptr || g_data == nullptr || g_held < 0 || g_held >= g_model->nq) {
 		return false;
 	}
-	g_data->qpos[i] = (double)angle;
-	g_data->qvel[i] = 0.0;
+	g_data->qpos[g_held] = angle;
+	g_data->qvel[g_held] = 0.0;
 	mj_forward(g_model, g_data);
 	return true;
 }
@@ -330,7 +345,8 @@ int main() {
 	ADD_API_FUNCTION(mjc_bodies, "PackedFloat64Array", "", "Body transforms as x,y,z,qw,qx,qy,qz");
 	ADD_API_FUNCTION(mjc_ngeom, "int", "", "Number of geoms");
 	ADD_API_FUNCTION(mjc_geoms, "Array", "", "Geoms as type, size xyz, pos xyz, quat wxyz");
-	ADD_API_FUNCTION(mjc_hold, "bool", "int index, float angle", "Hold a hinge at an angle");
+	ADD_API_FUNCTION(mjc_select, "bool", "int index", "Choose the hinge a hold applies to");
+	ADD_API_FUNCTION(mjc_hold, "bool", "float angle", "Hold the selected hinge at an angle");
 	ADD_API_FUNCTION(mjc_pivots, "PackedFloat64Array", "", "Per joint: anchor x, anchor z, pendulum length");
 	ADD_API_FUNCTION(mjc_time, "float", "", "Simulated time");
 	ADD_API_FUNCTION(mjc_qpos, "PackedFloat64Array", "", "Generalised positions");
