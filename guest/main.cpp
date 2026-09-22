@@ -326,6 +326,70 @@ static Variant mjc_lowest_mm() {
 	return lowest * 1000.0;
 }
 
+// Number of scalar controls. Zero means the model has no actuators to drive.
+static Variant mjc_nu() {
+	return g_model == nullptr ? 0 : (int)g_model->nu;
+}
+
+// Set the control vector, the actuator inputs the next step integrates. This is
+// how a policy on the host -- a taskweft agent steering a crowd -- drives the
+// bodies without the physics knowing anything about the policy. Extra entries
+// are ignored; short vectors leave the rest untouched.
+static Variant mjc_set_ctrl(PackedArray<double> ctrl) {
+	if (g_model == nullptr || g_data == nullptr) {
+		return false;
+	}
+	const std::vector<double> c = ctrl.fetch();
+	const int n = (int)c.size() < g_model->nu ? (int)c.size() : g_model->nu;
+	for (int i = 0; i < n; i++) {
+		g_data->ctrl[i] = c[i];
+	}
+	return true;
+}
+
+// Number of flex vertices across every flex, so the host can size its mesh.
+static Variant mjc_nflexvert() {
+	return g_model == nullptr ? 0 : (int)g_model->nflexvert;
+}
+
+// Every flex vertex as x, y, z. This is the deformable surface -- cloth --
+// which mjc_geoms does not carry, since a flex is not a geom. Streamed per frame.
+static Variant mjc_flexverts() {
+	std::vector<double> out;
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(out);
+	}
+	out.reserve((size_t)g_model->nflexvert * 3);
+	for (int i = 0; i < g_model->nflexvert; i++) {
+		out.push_back(g_data->flexvert_xpos[i * 3 + 0]);
+		out.push_back(g_data->flexvert_xpos[i * 3 + 1]);
+		out.push_back(g_data->flexvert_xpos[i * 3 + 2]);
+	}
+	return PackedArray<double>(out);
+}
+
+// Triangle vertex indices for every flex element, flattened as dim+1 per element
+// (three for a 2D sheet). The connectivity is fixed, so the host reads it once
+// and reuses it while mjc_flexverts streams the moving positions.
+static Variant mjc_flexfaces() {
+	std::vector<double> out;
+	if (g_model == nullptr) {
+		return PackedArray<double>(out);
+	}
+	for (int f = 0; f < g_model->nflex; f++) {
+		const int vper = g_model->flex_dim[f] + 1;
+		const int base = g_model->flex_elemdataadr[f];
+		const int num = g_model->flex_elemnum[f];
+		const int vadr = g_model->flex_vertadr[f];
+		for (int e = 0; e < num; e++) {
+			for (int k = 0; k < vper; k++) {
+				out.push_back((double)(vadr + g_model->flex_elem[base + e * vper + k]));
+			}
+		}
+	}
+	return PackedArray<double>(out);
+}
+
 int main() {
 	// Initialises the ctype tables tinyxml2 needs to find attributes.
 	setlocale(LC_ALL, "C");
@@ -352,5 +416,10 @@ int main() {
 	ADD_API_FUNCTION(mjc_qpos, "PackedFloat64Array", "", "Generalised positions");
 	ADD_API_FUNCTION(mjc_digest, "int", "", "Digest of the full integration state");
 	ADD_API_FUNCTION(mjc_lowest_mm, "float", "", "Lowest body height in millimetres");
+	ADD_API_FUNCTION(mjc_nu, "int", "", "Number of scalar controls");
+	ADD_API_FUNCTION(mjc_set_ctrl, "bool", "PackedFloat64Array ctrl", "Set the actuator control vector");
+	ADD_API_FUNCTION(mjc_nflexvert, "int", "", "Number of flex vertices");
+	ADD_API_FUNCTION(mjc_flexverts, "PackedFloat64Array", "", "Flex vertex positions as x,y,z");
+	ADD_API_FUNCTION(mjc_flexfaces, "PackedFloat64Array", "", "Flex triangle vertex indices, dim+1 per element");
 	halt();
 }
