@@ -1,0 +1,121 @@
+name: fp-determinism
+
+# The physics guest is RISC-V, emulated by libriscv, so the same stepping must
+# produce a bit-identical state digest on every host regardless of OS or CPU.
+# This runs the committed guest through the real sandbox host on x86_64 and
+# arm64 and fails if the digests differ. arm64 vs x86_64 is the test that
+# matters: different FP hardware, and the platforms we ship to (desktop and
+# Steam Deck are x86_64, Quest is arm64).
+
+on:
+  push:
+    paths:
+      - "project/**"
+      - "tools/determinism/**"
+      - "patches/**"
+      - ".github/workflows/fp-determinism.yml"
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7.2-stable"
+  FORK: "https://github.com/V-Sekai-fire/godot-sandbox"
+
+jobs:
+  digest:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,     arch: x86_64, build: true }
+          - { os: ubuntu-24.04-arm,  arch: arm64,  build: true }
+          - { os: windows-latest,    arch: x86_64, build: false }  # reuse the committed DLL
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Build the extension natively (Linux legs) ---
+      - name: Install build tools (Linux)
+        if: matrix.build
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang
+
+      - name: Build the sandbox extension from the fork
+        if: matrix.build
+        run: |
+          set -e
+          git clone --recursive --depth 1 "$FORK" gs
+          # Apply the vendored-dependency patches (paging/FP fix, includes, stdlib).
+          git -C gs/ext/libriscv apply "$GITHUB_WORKSPACE/patches/libriscv-paging-and-includes.patch"
+          git -C gs/ext/godot-cpp apply "$GITHUB_WORKSPACE/patches/godot-cpp-stdlib-include.patch"
+          cmake -S gs -B gs/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_SAFEGDSCRIPT=OFF -DRISCV_BINARY_TRANSLATION=OFF
+          cmake --build gs/build -j --target godot-riscv
+          SO=$(find gs/build -name 'libgodot-riscv*.so' -o -name 'libgodot_riscv*.so' | head -1)
+          test -n "$SO"
+          cp "$SO" "project/addons/godot_sandbox/bin/libgodot_riscv.linux.template_release.${{ matrix.arch }}.so"
+          echo "installed $SO -> linux ${{ matrix.arch }}"
+
+      # --- Godot ---
+      - name: Get Godot (Linux)
+        if: matrix.build
+        run: |
+          set -e
+          case "${{ matrix.arch }}" in
+            x86_64) A=linux.x86_64 ;;
+            arm64)  A=linux.arm64  ;;
+          esac
+          URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_${A}.zip"
+          curl -fL "$URL" -o godot.zip
+          unzip -o godot.zip
+          mv Godot_v${GODOT_VERSION}_${A} godot
+          chmod +x godot
+
+      - name: Get Godot (Windows)
+        if: ${{ !matrix.build }}
+        shell: bash
+        run: |
+          set -e
+          URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_win64.exe.zip"
+          curl -fL "$URL" -o godot.zip
+          unzip -o godot.zip
+          mv Godot_v${GODOT_VERSION}_win64.exe godot.exe
+
+      # --- Import once (registers classes), then run the digest ---
+      - name: Compute digest
+        shell: bash
+        run: |
+          set -e
+          GODOT="$GITHUB_WORKSPACE/godot"; [ -f "$GITHUB_WORKSPACE/godot.exe" ] && GODOT="$GITHUB_WORKSPACE/godot.exe"
+          cd project
+          # Import once so the extension's classes register, then run the digest.
+          # -s resolves relative to the CWD, so it must be run from project/.
+          "$GODOT" --headless --path . --import 2>&1 | tail -3 || true
+          OUT=$("$GODOT" --headless --path . -s ../tools/determinism/digest.gd 2>&1)
+          echo "$OUT"
+          LINE=$(echo "$OUT" | grep -o 'DIGEST=[0-9-]* STEPS=[0-9]* NQ=[0-9]*' | head -1)
+          test -n "$LINE"
+          echo "$LINE" > "$GITHUB_WORKSPACE/digest-${{ matrix.os }}-${{ matrix.arch }}.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.os }}-${{ matrix.arch }}
+          path: digest-*.txt
+
+  compare:
+    needs: digest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: digests, merge-multiple: true }
+      - name: All platforms must agree
+        run: |
+          set -e
+          echo "=== per-platform digests ==="
+          cat digests/*.txt
+          UNIQUE=$(sort -u digests/*.txt | wc -l)
+          if [ "$UNIQUE" -ne 1 ]; then
+            echo "FAIL: the guest is not deterministic across platforms ($UNIQUE distinct digests)"
+            exit 1
+          fi
+          echo "PASS: identical physics digest on every platform"
