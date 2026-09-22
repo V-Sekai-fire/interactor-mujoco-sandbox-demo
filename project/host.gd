@@ -16,6 +16,16 @@ extends Node3D
 const PHYSICS_ELF := "res://plans/mujoco.elf"
 const SNAPSHOT_PATH := "user://cradle.snapshot"
 
+# The ball the pointer is on gets an inverted-hull outline: the same mesh drawn
+# again, grown along its normals, front faces culled and unshaded, so only the
+# rim shows behind the ball. DFOutlineNode was tried first and is the wrong
+# shape for this -- it is a whole-screen post-process that re-composites the
+# scene from its own masked subviewport, so pointing it at one render layer
+# left it drawing that ball and hiding everything else.
+const OUTLINE_COLOR := Color(1.0, 0.85, 0.2)
+const OUTLINE_GROW := 0.0016 # metres, about a sixth of a ball radius
+var _outline_material: StandardMaterial3D = null
+
 var _a: Object = null
 var _b: Object = null
 var _a_holder: Node3D = null
@@ -37,6 +47,13 @@ var _hovered := -1
 var _grabbed := -1
 var _pivots: PackedFloat64Array = PackedFloat64Array()
 
+# The model's own timestep, and a carry so the guest is stepped to wall-clock
+# rather than a fixed count per frame. A fixed count tied the sim speed to the
+# frame rate: at 60 fps and 4 steps of 0.2 ms it ran at about 5% of real time.
+const SIM_TIMESTEP := 0.0002
+const MAX_STEPS_PER_FRAME := 240  # ~0.048 s of sim; caps catch-up after a stall
+var _sim_carry := 0.0
+
 
 func _ready() -> void:
 	_build_ui()
@@ -57,10 +74,24 @@ func _ready() -> void:
 	_say("right sandbox has no model at all")
 
 
+## One material shared by every highlighted ball, hung off the ball's own
+## material as a second pass so it follows the ball with no extra node.
+func _outline_pass() -> StandardMaterial3D:
+	if _outline_material == null:
+		_outline_material = StandardMaterial3D.new()
+		_outline_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_outline_material.cull_mode = BaseMaterial3D.CULL_FRONT
+		_outline_material.albedo_color = OUTLINE_COLOR
+		_outline_material.grow = true
+		_outline_material.grow_amount = OUTLINE_GROW
+	return _outline_material
+
+
 ## The controls are built here rather than in the scene, so the scene stays a
 ## camera and a light and there is one place to read what each button does.
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
+	layer.layer = 200 # above the outline node's post-process layers (100+)
 	add_child(layer)
 
 	# Top-left and only as wide as it needs to be, so the figure in the middle
@@ -135,10 +166,19 @@ func _process(_delta: float) -> void:
 	if _a == null:
 		return
 	if _running:
-		for i in range(4):
+		_sim_carry += _delta
+		var b_live: bool = _b.vmcall("mjc_nq") > 0
+		var steps := 0
+		while _sim_carry >= SIM_TIMESTEP and steps < MAX_STEPS_PER_FRAME:
 			_a.vmcall("mjc_step")
-			if _b.vmcall("mjc_nq") > 0:
+			if b_live:
 				_b.vmcall("mjc_step")
+			_sim_carry -= SIM_TIMESTEP
+			steps += 1
+		# Drop any backlog we could not work off, so a hitch does not become a
+		# permanent fast-forward.
+		if _sim_carry > SIM_TIMESTEP:
+			_sim_carry = 0.0
 	_register_balls()
 	_draw(_a, _a_holder)
 	_draw(_b, _b_holder)
@@ -213,6 +253,9 @@ func _draw(sb: Object, holder: Node3D) -> void:
 				m.emission_enabled = lit
 				m.emission = Color(1.0, 0.95, 0.7)
 				m.emission_energy_multiplier = 1.6 if ball == _grabbed else 0.7
+				# The outline is a second pass on the ball's own material, so it
+				# appears and disappears with the selection and needs no nodes.
+				m.next_pass = _outline_pass() if lit else null
 
 
 ## One lasso point per ball, anchored to a node the draw loop keeps on the

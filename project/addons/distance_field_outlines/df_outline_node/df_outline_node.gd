@@ -1,9 +1,9 @@
 @tool
 extends Node
 
-const EXTRACTION_SHADER_PATH := "res://df_outline_node/shaders/extraction.gdshader"
-const JF_PASS_SHADER_PATH := "res://df_outline_node/shaders/jf_pass.gdshader"
-const OVERLAY_SHADER_PATH := "res://df_outline_node/shaders/overlay.gdshader"
+const EXTRACTION_SHADER_PATH := "res://addons/distance_field_outlines/df_outline_node/shaders/extraction.gdshader"
+const JF_PASS_SHADER_PATH := "res://addons/distance_field_outlines/df_outline_node/shaders/jf_pass.gdshader"
+const OVERLAY_SHADER_PATH := "res://addons/distance_field_outlines/df_outline_node/shaders/overlay.gdshader"
 
 const DEBUG_PRINT_DISPLAY_SIZES := false
 

@@ -24,7 +24,7 @@ script/skip=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_sandbox/plugin.cfg", "res://addons/vsekai_godot_mcp/plugin.cfg", "res://addons/canvas_plane/plugin.cfg", "res://addons/interaction_system/plugin.cfg")
+enabled=PackedStringArray("res://addons/canvas_plane/plugin.cfg", "res://addons/godot_sandbox/plugin.cfg", "res://addons/interaction_system/plugin.cfg", "res://addons/vsekai_godot_mcp/plugin.cfg")
 
 [rendering]
 

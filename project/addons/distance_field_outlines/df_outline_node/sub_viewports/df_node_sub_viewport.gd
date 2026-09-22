@@ -34,6 +34,11 @@ func setup(p_camera : Camera3D) -> void:
 	viewport_camera = scene_camera.duplicate()
 	add_child(viewport_camera)
 	viewport_camera.current = true
+	# The class comment promises this camera gets the specified cull mask, but
+	# nothing applied it: the duplicate inherited the scene camera's all-layers
+	# mask, so the outline pass saw the whole scene instead of the selection.
+	if cull_mask != 0:
+		viewport_camera.cull_mask = cull_mask
 
 	if remote_transform:
 		remote_transform.queue_free()
