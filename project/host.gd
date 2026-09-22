@@ -50,7 +50,7 @@ var _pivots: PackedFloat64Array = PackedFloat64Array()
 # The model's own timestep, and a carry so the guest is stepped to wall-clock
 # rather than a fixed count per frame. A fixed count tied the sim speed to the
 # frame rate: at 60 fps and 4 steps of 0.2 ms it ran at about 5% of real time.
-const SIM_TIMESTEP := 0.0002
+const SIM_TIMESTEP := 0.001
 const MAX_STEPS_PER_FRAME := 240  # ~0.048 s of sim; caps catch-up after a stall
 var _sim_carry := 0.0
 

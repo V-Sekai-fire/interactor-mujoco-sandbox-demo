@@ -1,6 +1,6 @@
 <mujoco model="newtons_cradle">
   <compiler angle="radian"/>
-  <option timestep="0.0002" gravity="0 0 -9.81" integrator="implicitfast" iterations="200" ls_iterations="50" tolerance="1e-12"/>
+  <option timestep="0.001" gravity="0 0 -9.81" integrator="implicitfast" iterations="50" ls_iterations="50" tolerance="1e-12"/>
   <default>
     <geom solref="-120000 -180" solimp="0.98 0.999 0.0002" friction="0.001 0.0001 0.00001"/>
     <joint damping="0.00002"/>
