@@ -1,0 +1,40 @@
+diff --git a/lib/libriscv/serialize.cpp b/lib/libriscv/serialize.cpp
+index 2442651..40617d3 100644
+--- a/lib/libriscv/serialize.cpp
++++ b/lib/libriscv/serialize.cpp
+@@ -96,10 +96,11 @@ namespace riscv
+ 	size_t Memory<W>::serialize_to(std::vector<uint8_t>& vec) const
+ 	{
+ 		const size_t before = vec.size();
+-		if (this->m_arena.pages > 0 && riscv::flat_readwrite_arena) {
+-			throw MachineException(
+-				FEATURE_DISABLED, "Serialize is incompatible with flat read-write arena");
+-		}
++		// The arena used to be refused here. It does not need to be: its pages
++		// appear in m_pages as non-owning entries whose data() points into the
++		// arena buffer, so the loop below writes their bytes like any other
++		// page, and deserialize_from already rebuilds an arena page as a
++		// non-owning view (see its m_arena.pages branch).
+ 
+ #ifdef RISCV_VIRTUAL_PAGING
+ 		const size_t est_page_bytes =
+diff --git a/lib/libriscv/tr_compiler.cpp b/lib/libriscv/tr_compiler.cpp
+index 98edfb7..836cdb4 100644
+--- a/lib/libriscv/tr_compiler.cpp
++++ b/lib/libriscv/tr_compiler.cpp
+@@ -1,5 +1,6 @@
+ #include "common.hpp"
+ 
++#include <cstdlib>
+ #include <cstring>
+ #if defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)
+ #include "win32/dlfcn.h"
+diff --git a/lib/libriscv/tr_emit.cpp b/lib/libriscv/tr_emit.cpp
+index e53842f..f8177b6 100644
+--- a/lib/libriscv/tr_emit.cpp
++++ b/lib/libriscv/tr_emit.cpp
+@@ -1,3 +1,4 @@
++#include <cstdlib>
+ #include "machine.hpp"
+ #include "decoder_cache.hpp"
+ #include "instruction_list.hpp"
