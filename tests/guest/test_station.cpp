@@ -76,6 +76,25 @@ void box(std::vector<double> &prims, double cx, double cy, double cz, double hx,
 	prims.insert(prims.end(), p, p + station::kPrimStride);
 }
 
+void walk_box(std::vector<double> &prims, double cx, double cy, double cz, double hx, double hy, double hz) {
+	const double p[station::kPrimStride] = { station::kWalkBox, cx, cy, cz, hx, hy, hz, 1, 0, 0, 0, 0 };
+	prims.insert(prims.end(), p, p + station::kPrimStride);
+}
+
+// The player as the walker uses it: a 0.3 m cylinder over [0.45, 1.7] above the feet.
+struct BandStation : Station {
+	BandStation(const std::vector<double> &prims, double fx, double fy, double fz) :
+			Station((station::set_player_band(0.3, 0.45, 1.7), prims), {}, 0, 0, {}) {
+		station::set_player_band(0.0, 0.0, 0.0);
+		if (d != nullptr) {
+			d->qpos[0] = fx;
+			d->qpos[1] = fy;
+			d->qpos[2] = fz;
+			mj_forward(m, d);
+		}
+	}
+};
+
 void cylinder(std::vector<double> &prims, double cx, double cy, double cz, double r, double hh) {
 	const double p[station::kPrimStride] = { station::kCylinder, cx, cy, cz, r, hh, 0, 1, 0, 0, 0, 0 };
 	prims.insert(prims.end(), p, p + station::kPrimStride);
@@ -208,4 +227,52 @@ TEST_CASE("[falsification] a box moved by one ulp changes the contacts") {
 	const std::vector<uint8_t> a = walk_bytes(walk_prims(0.0));
 	const std::vector<uint8_t> b = walk_bytes(walk_prims(nextafter(1.0, 2.0) - 1.0));
 	CHECK((a.size() != b.size() || memcmp(a.data(), b.data(), a.size()) != 0));
+}
+
+TEST_CASE("[unit] a walkable ray stands on the walk top under a solid box") {
+	std::vector<double> prims;
+	box(prims, 0.0, 0.2, 0.0, 1.0, 0.2, 1.0);
+	walk_box(prims, 0.0, -0.25, 0.0, 2.0, 0.25, 2.0);
+	Station s(prims, {}, 0, 0, {});
+	REQUIRE_MESSAGE(s.m != nullptr, s.error);
+	const double o[3] = { 0.0, 5.0, 0.0 };
+	const double v[3] = { 0.0, -1.0, 0.0 };
+	const std::vector<double> walkable = station::ray(s.m, s.d, o, v, 100.0, s.player(), 1);
+	CHECK(walkable[0] == 1.0);
+	CHECK(fabs(walkable[3] - 0.0) < 1e-12);
+}
+
+TEST_CASE("[falsification] the same ray over every group stops on the solid box") {
+	std::vector<double> prims;
+	box(prims, 0.0, 0.2, 0.0, 1.0, 0.2, 1.0);
+	walk_box(prims, 0.0, -0.25, 0.0, 2.0, 0.25, 2.0);
+	Station s(prims, {}, 0, 0, {});
+	REQUIRE(s.m != nullptr);
+	const std::vector<double> any = s.cast(0.0, 5.0, 0.0, 0.0, -1.0, 0.0);
+	CHECK(fabs(any[3] - 0.4) < 1e-12);
+}
+
+TEST_CASE("[unit] a wall overlapping the band pushes the player straight out") {
+	std::vector<double> prims;
+	box(prims, 1.0, 1.0, 0.0, 0.8, 1.0, 1.0);
+	BandStation s(prims, 0.0, 0.0, 0.0);
+	REQUIRE_MESSAGE(s.m != nullptr, s.error);
+	const std::vector<double> c = station::player_contacts(s.m, s.d);
+	REQUIRE(!c.empty());
+	REQUIRE(c.size() % 5 == 0);
+	double deepest = 0.0;
+	for (size_t i = 0; i < c.size(); i += 5) {
+		CHECK(c[i + 1] < -0.999);
+		CHECK(fabs(c[i + 2]) < 1e-9);
+		deepest = c[i + 4] < deepest ? c[i + 4] : deepest;
+	}
+	CHECK(fabs(deepest + 0.1) < 1e-6);
+}
+
+TEST_CASE("[falsification] a box whose top is below the band does not touch it") {
+	std::vector<double> prims;
+	box(prims, 0.5, 0.2, 0.0, 0.8, 0.2, 1.0);
+	BandStation s(prims, 0.0, 0.0, 0.0);
+	REQUIRE(s.m != nullptr);
+	CHECK(station::player_contacts(s.m, s.d).empty());
 }

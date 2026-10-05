@@ -427,6 +427,25 @@ static Variant mjc_ray(PackedArray<double> origin, PackedArray<double> dir, doub
 	return PackedArray<double>(station::ray(g_model, g_data, o.data(), v.data(), maxdist, exclude_body));
 }
 
+static Variant mjc_ray_group(PackedArray<double> origin, PackedArray<double> dir, double maxdist, int exclude_body,
+		int group) {
+	const std::vector<double> o = origin.fetch();
+	const std::vector<double> v = dir.fetch();
+	if (o.size() != 3 || v.size() != 3) {
+		return PackedArray<double>(station::ray(nullptr, nullptr, nullptr, nullptr, 0.0, -1));
+	}
+	return PackedArray<double>(station::ray(g_model, g_data, o.data(), v.data(), maxdist, exclude_body, group));
+}
+
+static Variant mjc_player_band(double radius, double bottom, double top) {
+	station::set_player_band(radius, bottom, top);
+	return radius > 0.0 && top > bottom;
+}
+
+static Variant mjc_player_contacts() {
+	return PackedArray<double>(station::player_contacts(g_model, g_data));
+}
+
 static bool set_state(PackedArray<double> values, mjtNum *dst, int count) {
 	const std::vector<double> v = values.fetch();
 	if (g_model == nullptr || dst == nullptr || v.size() != (size_t)count) {
@@ -555,5 +574,8 @@ int main() {
 	ADD_API_FUNCTION(mjc_set_qvel, "bool", "PackedFloat64Array qvel", "Set every generalised velocity");
 	ADD_API_FUNCTION(mjc_forward, "bool", "", "Kinematics and collision without integrating");
 	ADD_API_FUNCTION(mjc_mocap_set, "bool", "int index, PackedFloat64Array pose", "Place a mocap body at x,y,z,qw,qx,qy,qz");
+	ADD_API_FUNCTION(mjc_ray_group, "PackedFloat64Array", "PackedFloat64Array origin, PackedFloat64Array dir, float maxdist, int exclude_body, int group", "Nearest hit within one geom group (1 is walkable)");
+	ADD_API_FUNCTION(mjc_player_band, "bool", "float radius, float bottom, float top", "Make the next load's player a vertical cylinder over [bottom, top]");
+	ADD_API_FUNCTION(mjc_player_contacts, "PackedFloat64Array", "", "Player contacts: other geom, normal xyz into the player, dist");
 	halt();
 }

@@ -11,6 +11,10 @@ namespace {
 // turn about x carries local z onto y.
 const double kZToY[4] = { 0.70710678118654752440, -0.70710678118654752440, 0.0, 0.0 };
 
+double g_band_radius = 0.0;
+double g_band_bottom = 0.0;
+double g_band_top = 0.0;
+
 void append(std::string &s, const char *fmt, double a, double b, double c) {
 	char buf[160];
 	snprintf(buf, sizeof(buf), fmt, a, b, c);
@@ -38,6 +42,9 @@ void append_geom(std::string &s, const double *p, bool at_origin) {
 	} else {
 		append(s, "<geom type='box' size='%.17g %.17g %.17g'", p[4], p[5], p[6]);
 		append_quat(s, q);
+		if (type == kWalkBox) {
+			s += " group='1'";
+		}
 	}
 	if (!at_origin) {
 		append(s, " pos='%.17g %.17g %.17g'", p[1], p[2], p[3]);
@@ -89,7 +96,7 @@ std::string build_mjcf(const std::vector<double> &prims, const std::vector<doubl
 	}
 	s += "<worldbody>";
 	if (terrain) {
-		s += "<geom type='hfield' hfield='terrain'";
+		s += "<geom type='hfield' hfield='terrain' group='1'";
 		append(s, " pos='%.17g %.17g %.17g'", hsize[2], lo, hsize[3]);
 		append_quat(s, kZToY);
 		s += "/>";
@@ -114,13 +121,25 @@ std::string build_mjcf(const std::vector<double> &prims, const std::vector<doubl
 		append_geom(s, p, true);
 		s += "</body>";
 	}
-	const double half = kPlayerHeight * 0.5 - kPlayerRadius;
 	s += "<body name='player'><joint type='slide' axis='1 0 0'/><joint type='slide' axis='0 1 0'/>"
 		 "<joint type='slide' axis='0 0 1'/>";
-	append(s, "<geom type='capsule' size='%.17g %.17g' pos='0 %.17g 0'", kPlayerRadius, half, kPlayerHeight * 0.5);
+	if (g_band_radius > 0.0) {
+		append(s, "<geom type='cylinder' size='%.17g %.17g' pos='0 %.17g 0'", g_band_radius,
+				(g_band_top - g_band_bottom) * 0.5, (g_band_top + g_band_bottom) * 0.5);
+	} else {
+		const double half = kPlayerHeight * 0.5 - kPlayerRadius;
+		append(s, "<geom type='capsule' size='%.17g %.17g' pos='0 %.17g 0'", kPlayerRadius, half, kPlayerHeight * 0.5);
+	}
 	append_quat(s, kZToY);
 	s += "/></body></worldbody></mujoco>";
 	return s;
+}
+
+void set_player_band(double radius, double bottom, double top) {
+	const bool valid = radius > 0.0 && top > bottom;
+	g_band_radius = valid ? radius : 0.0;
+	g_band_bottom = valid ? bottom : 0.0;
+	g_band_top = valid ? top : 0.0;
 }
 
 mjModel *load_mjcf(const std::string &xml, std::string &error) {
@@ -141,7 +160,7 @@ mjModel *load_mjcf(const std::string &xml, std::string &error) {
 }
 
 std::vector<double> ray(const mjModel *m, const mjData *d, const double origin[3], const double dir[3],
-		double maxdist, int exclude_body) {
+		double maxdist, int exclude_body, int group) {
 	std::vector<double> out(9, 0.0);
 	out[8] = -1.0;
 	const double len = sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
@@ -151,7 +170,11 @@ std::vector<double> ray(const mjModel *m, const mjData *d, const double origin[3
 	const double unit[3] = { dir[0] / len, dir[1] / len, dir[2] / len };
 	int geom = -1;
 	double normal[3] = { 0.0, 0.0, 0.0 };
-	const double dist = mj_ray(m, d, origin, unit, nullptr, 1, exclude_body, &geom, normal);
+	mjtByte groups[mjNGROUP] = { 0 };
+	if (group >= 0 && group < mjNGROUP) {
+		groups[group] = 1;
+	}
+	const double dist = mj_ray(m, d, origin, unit, group < 0 ? nullptr : groups, 1, exclude_body, &geom, normal);
 	if (dist < 0.0 || dist > maxdist) {
 		return out;
 	}
@@ -162,6 +185,30 @@ std::vector<double> ray(const mjModel *m, const mjData *d, const double origin[3
 		out[5 + k] = normal[k];
 	}
 	out[8] = (double)geom;
+	return out;
+}
+
+std::vector<double> player_contacts(const mjModel *m, const mjData *d) {
+	std::vector<double> out;
+	if (m == nullptr || d == nullptr || m->nbody < 2) {
+		return out;
+	}
+	const int player = m->nbody - 1;
+	for (int i = 0; i < d->ncon; i++) {
+		const mjContact &c = d->contact[i];
+		const bool first = m->geom_bodyid[c.geom[0]] == player;
+		const bool second = m->geom_bodyid[c.geom[1]] == player;
+		if (first == second) {
+			continue;
+		}
+		// The frame's normal points from geom[0] to geom[1].
+		const double sign = second ? 1.0 : -1.0;
+		out.push_back((double)(second ? c.geom[0] : c.geom[1]));
+		for (int k = 0; k < 3; k++) {
+			out.push_back(sign * c.frame[k]);
+		}
+		out.push_back(c.dist);
+	}
 	return out;
 }
 
