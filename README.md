@@ -46,6 +46,9 @@ Godot's frame (y up, metres). `guest/station.h` has the layouts.
 | `mjc_set_qpos(q)`, `mjc_set_qvel(v)` | the whole state at once; a wrong length is refused |
 | `mjc_forward()` | kinematics and contacts without integrating |
 | `mjc_mocap_set(i, pose)` | moves a mocap collider (a train or a vehicle) to x, y, z, qw, qx, qy, qz |
+| `mjc_ray_group(origin, dir, maxdist, exclude_body, group)` | as `mjc_ray`, but only geom group `group`: walk tops, ramps (primitive type 2) and the terrain are group 1, so a downward ray finds the ground a walker may stand on |
+| `mjc_player_band(radius, bottom, top)` | the next load's player is a vertical cylinder over [bottom, top] above its origin (the walker uses 0.3 m over [0.45, 1.7]) instead of the capsule |
+| `mjc_player_contacts()` | the player's contacts: other geom, normal xyz pointing into the player, dist |
 
 The pen runs a double-precision engine, so the guest is built at `DOUBLE_PRECISION=ON` against
 the manifest's contract-guest-runtime API, which marks it `.sandbox_variant` 40:
