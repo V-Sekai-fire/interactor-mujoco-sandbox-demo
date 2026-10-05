@@ -20,6 +20,10 @@ env:
   GODOT_VERSION: "4.7.2-stable"
   FORK: "https://github.com/V-Sekai-fire/godot-sandbox"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   digest:
     strategy:
