@@ -438,6 +438,34 @@ static bool set_state(PackedArray<double> values, mjtNum *dst, int count) {
 	return true;
 }
 
+// Each point inside the loaded model moves out to the surface it would exit
+// through along a horizontal ray from the vertical axis (axis_x, axis_z), plus
+// thickness; a first hit facing the point means outside, and it stays.
+// Answers the points, then how many moved.
+static Variant mj_push_out(PackedArray<double> points, double axis_x, double axis_z, double thickness) {
+	std::vector<double> out = points.fetch();
+	int moved = 0;
+	for (size_t i = 0; i + 2 < out.size(); i += 3) {
+		double d[3] = { out[i] - axis_x, 0.0, out[i + 2] - axis_z };
+		const double len = sqrt(d[0] * d[0] + d[2] * d[2]);
+		if (!(len > 1e-9)) {
+			continue;
+		}
+		d[0] /= len;
+		d[2] /= len;
+		const std::vector<double> hit = station::ray(g_model, g_data, &out[i], d, 4.0, -1);
+		if (hit[0] < 0.5 || hit[5] * d[0] + hit[6] * d[1] + hit[7] * d[2] <= 0.0) {
+			continue;
+		}
+		for (int k = 0; k < 3; k++) {
+			out[i + k] = hit[2 + k] + d[k] * thickness;
+		}
+		moved++;
+	}
+	out.push_back((double)moved);
+	return PackedArray<double>(out);
+}
+
 static Variant mjc_set_qpos(PackedArray<double> qpos) {
 	return set_state(qpos, g_data == nullptr ? nullptr : g_data->qpos, g_model == nullptr ? 0 : (int)g_model->nq);
 }
@@ -521,6 +549,7 @@ int main() {
 	ADD_API_FUNCTION(mjc_digest, "int", "", "Digest of the full integration state");
 	ADD_API_FUNCTION(mjc_lowest_mm, "float", "", "Lowest body height in millimetres");
 	ADD_API_FUNCTION(mjc_load_primitives, "int", "PackedFloat64Array prims, PackedFloat64Array grid, int nrow, int ncol, PackedFloat64Array hsize", "Load station colliders, terrain and the player capsule; returns the geom count or -1");
+	ADD_API_FUNCTION(mj_push_out, "PackedFloat64Array", "PackedFloat64Array points, float axis_x, float axis_z, float thickness", "Move points inside the model out through its surface; last value is the count moved");
 	ADD_API_FUNCTION(mjc_ray, "PackedFloat64Array", "PackedFloat64Array origin, PackedFloat64Array dir, float maxdist, int exclude_body", "Nearest hit: hit, dist, point xyz, normal xyz, geom");
 	ADD_API_FUNCTION(mjc_set_qpos, "bool", "PackedFloat64Array qpos", "Set every generalised position");
 	ADD_API_FUNCTION(mjc_set_qvel, "bool", "PackedFloat64Array qvel", "Set every generalised velocity");
