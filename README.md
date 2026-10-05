@@ -8,9 +8,12 @@ The host owns the tick: every step happens because the script asked for one, so 
 
 ## Build and run
 
+    godot --path project --import
     godot --path project
 
-To rebuild the guest, configure `guest/` with CMake, using `third_party/riscv64-sysroot/toolchain.cmake` as the toolchain file.
+The import registers the sandbox extension on a fresh clone.
+
+To rebuild the guest, configure `guest/` with CMake, using `third_party/riscv64-sysroot/toolchain.cmake` as the toolchain file, and copy the built `mjstep` program to `project/plans/mujoco.elf`, the path the host loads.
 
 ## Licence
 
