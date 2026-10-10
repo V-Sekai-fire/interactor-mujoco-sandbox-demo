@@ -17,4 +17,4 @@ To rebuild the guest, configure `guest/` with CMake, using `third_party/riscv64-
 
 ## Licence
 
-The licence is not stated. Vendored projects under `third_party/` carry their own licences.
+MIT. See [LICENSE](LICENSE). Vendored projects under `third_party/` carry their own licences.
