@@ -13,6 +13,14 @@ on:
       - "project/**"
       - "tools/determinism/**"
       - "patches/**"
+      - "third_party/**"
+      - ".github/workflows/fp-determinism.yml"
+  pull_request:
+    paths:
+      - "project/**"
+      - "tools/determinism/**"
+      - "patches/**"
+      - "third_party/**"
       - ".github/workflows/fp-determinism.yml"
   workflow_dispatch:
 
