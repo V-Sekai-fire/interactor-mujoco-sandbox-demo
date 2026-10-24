@@ -37,12 +37,13 @@ static std::vector<double> fresh(const Strokes &s, double prox) {
 	return f.find(p, c, prox);
 }
 
-// Brute force: every segment pair of different strokes, no pruning, same coalescing rule.
-static std::vector<double> brute(const Strokes &s, double prox) {
+// Brute force: every segment pair of different strokes, no pruning, the same coalescing rule
+// (closest first, merged only within one stroke pair). Crossings of strokes [from, end).
+static std::vector<double> brute(const Strokes &s, double prox, size_t from = 0) {
 	std::vector<double> out;
 	const double merge = prox * 3.0 > 0.03 ? prox * 3.0 : 0.03;
-	for (size_t si = 1; si < s.size(); si++) {
-		struct H { double d2, p[3]; };
+	for (size_t si = std::max<size_t>(from, 1); si < s.size(); si++) {
+		struct H { double d2; size_t o; double p[3]; };
 		std::vector<H> hits;
 		for (size_t oi = 0; oi < si; oi++) {
 			for (size_t i = 0; i + 1 < s[si].size() / 3; i++) {
@@ -50,19 +51,21 @@ static std::vector<double> brute(const Strokes &s, double prox) {
 					double c1[3], c2[3];
 					double d2 = crossings::segment_closest(&s[si][i * 3], &s[si][i * 3 + 3], &s[oi][j * 3], &s[oi][j * 3 + 3], c1, c2);
 					if (d2 < prox * prox) {
-						hits.push_back({d2, {(c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2, (c1[2] + c2[2]) / 2}});
+						hits.push_back({d2, oi, {(c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2, (c1[2] + c2[2]) / 2}});
 					}
 				}
 			}
 		}
 		std::stable_sort(hits.begin(), hits.end(), [](const H &a, const H &b) { return a.d2 < b.d2; });
+		std::vector<std::pair<size_t, size_t>> kept;
 		for (const H &h : hits) {
 			bool m = false;
-			for (size_t k = 0; k + 2 < out.size(); k += 3) {
-				double dx = h.p[0] - out[k], dy = h.p[1] - out[k + 1], dz = h.p[2] - out[k + 2];
+			for (auto &k : kept) {
+				if (k.first != h.o) continue;
+				double dx = h.p[0] - out[k.second], dy = h.p[1] - out[k.second + 1], dz = h.p[2] - out[k.second + 2];
 				if (dx * dx + dy * dy + dz * dz < merge * merge) { m = true; break; }
 			}
-			if (!m) out.insert(out.end(), h.p, h.p + 3);
+			if (!m) { kept.push_back({h.o, out.size()}); out.insert(out.end(), h.p, h.p + 3); }
 		}
 	}
 	return out;
@@ -98,6 +101,19 @@ int main() {
 	for (auto &s : dup) s.insert(s.begin() + 3, s.begin(), s.begin() + 3);
 	check("repeated samples still give the three crossings", near_all(fresh(dup, 0.02), {{{0.9143, 0, 0}}, {{-0.9143, 0, 0}}, {{0, 1.4769, 0}}}, 0.01));
 
+	// Three strokes through nearly one point: the third must get a crossing with each of the
+	// other two, not have both merged into the first pair's crossing.
+	Strokes star = {seg(-1, 0, 0, 1, 0, 0, 20), seg(0, -1, 0, 0, 1, 0, 20), seg(-1, -1, 0.004f, 1, 1, 0.004f, 20)};
+	{
+		crossings::Finder f;
+		std::vector<float> p;
+		std::vector<int32_t> c;
+		flat(Strokes(star.begin(), star.begin() + 2), p, c);
+		f.find(p, c, 0.02);
+		flat(star, p, c);
+		check("three strokes at one point: the new stroke keeps a crossing per stroke it crosses", f.find(p, c, 0.02).size() == 6);
+	}
+
 	// Random strokes: pruned and incremental results equal the unpruned brute force.
 	std::mt19937 rng(7);
 	std::uniform_real_distribution<float> u(-0.5f, 0.5f);
@@ -124,7 +140,19 @@ int main() {
 		got = inc.find(p, c, 0.02);
 		tested = inc.strokes_tested_last();
 	}
-	check("incremental, one stroke per call, equals one call", got == want);
+	std::vector<double> all;
+	{
+		crossings::Finder inc2;
+		for (size_t k = 1; k <= rnd.size(); k++) {
+			std::vector<float> p;
+			std::vector<int32_t> c;
+			flat(Strokes(rnd.begin(), rnd.begin() + k), p, c);
+			auto r = inc2.find(p, c, 0.02);
+			all.insert(all.end(), r.begin(), r.end());
+		}
+	}
+	check("incremental: each call returns its new stroke's crossings, together equal to one call", all == want);
+	check("incremental: the last call returns only the last stroke's crossings", got == brute(rnd, 0.02, rnd.size() - 1));
 	check("incremental: the last call tested only the newest stroke", tested == 1);
 
 	// An earlier stroke changes: the finder must start over, not reuse stale crossings.

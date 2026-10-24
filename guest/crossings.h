@@ -3,13 +3,16 @@
 // A stroke is a polyline. Two strokes cross where a segment of one passes within `proximity`
 // of a segment of the other: the same test as two capsules of radius proximity/2 touching,
 // which is what the MuJoCo version modelled, without building and compiling a model. The
-// crossing point is the midpoint of the two segments' closest points. Nearby hits from one
-// crossing (a tessellated stroke touches with several segment pairs) coalesce: the closest pair
-// is kept and any later hit within merge_epsilon of a kept point is dropped.
+// crossing point is the midpoint of the two segments' closest points. Nearby hits of ONE
+// stroke pair (a tessellated stroke touches with several segment pairs) coalesce: the closest
+// is kept and any later hit of that pair within merge_epsilon of a kept point is dropped. Hits
+// of different pairs never merge: where three strokes meet near one point each pair keeps its
+// own crossing, so a stroke is never left without the split it needs.
 //
 // The finder is incremental. It keeps the strokes it has seen; when the next call's strokes
-// begin with the same strokes, only the new ones are tested, against everything. A pen that
-// sends every stroke drawn so far on each commit then pays for its newest stroke only.
+// begin with the same strokes, only the new ones are tested, against everything. A call
+// returns the crossings that involve the strokes new to it (every stroke, for a call that does
+// not extend the last one), which is what a pen committing one stroke needs.
 //
 // Header only and free of the sandbox API, so a host test can include it.
 #pragma once
@@ -113,9 +116,10 @@ public:
 			}
 		}
 		const double prox2 = proximity * proximity;
-		const double merge = proximity * 3.0 > 0.03 ? proximity * 3.0 : 0.03;
+		const double merge = proximity * 3.0 > 0.03 ? proximity * 3.0 : 0.03; // within one stroke pair
 		const double merge2 = merge * merge;
 		size_t off = points_.size() / 3;
+		std::vector<double> fresh;
 		for (size_t si = counts_.size(); si < counts.size(); si++) {
 			const int n = counts[si] > 0 ? counts[si] : 0;
 			Stroke s;
@@ -133,7 +137,8 @@ public:
 			// Hits of the new stroke with every earlier stroke, closest first, so a cluster
 			// keeps its best point whatever order the segments were met in.
 			std::vector<Hit> hits;
-			for (const Stroke &o : strokes_) {
+			for (size_t oi = 0; oi < strokes_.size(); oi++) {
+				const Stroke &o = strokes_[oi];
 				if (o.n < 2 || s.n < 2 || !boxes_touch(s.box, o.box, proximity)) {
 					continue;
 				}
@@ -153,30 +158,36 @@ public:
 						double c1[3], c2[3];
 						const double d2 = segment_closest(a0, a1, b0, b1, c1, c2);
 						if (d2 < prox2) {
-							hits.push_back({d2, {(c1[0] + c2[0]) * 0.5, (c1[1] + c2[1]) * 0.5, (c1[2] + c2[2]) * 0.5}});
+							hits.push_back({d2, oi, {(c1[0] + c2[0]) * 0.5, (c1[1] + c2[1]) * 0.5, (c1[2] + c2[2]) * 0.5}});
 						}
 					}
 				}
 			}
 			std::stable_sort(hits.begin(), hits.end(), [](const Hit &x, const Hit &y) { return x.d2 < y.d2; });
+			std::vector<std::pair<size_t, size_t>> kept; // (other stroke, index into fresh)
 			for (const Hit &h : hits) {
 				bool merged = false;
-				for (size_t j = 0; j + 2 < out_.size(); j += 3) {
-					const double dx = h.p[0] - out_[j], dy = h.p[1] - out_[j + 1], dz = h.p[2] - out_[j + 2];
+				for (const auto &k : kept) {
+					if (k.first != h.other) {
+						continue;
+					}
+					const double *q = &fresh[k.second];
+					const double dx = h.p[0] - q[0], dy = h.p[1] - q[1], dz = h.p[2] - q[2];
 					if (dx * dx + dy * dy + dz * dz < merge2) {
 						merged = true;
 						break;
 					}
 				}
 				if (!merged) {
-					out_.insert(out_.end(), h.p, h.p + 3);
+					kept.push_back({h.other, fresh.size()});
+					fresh.insert(fresh.end(), h.p, h.p + 3);
 				}
 			}
 			strokes_.push_back(s);
 			counts_.push_back(counts[si]);
 			off += (size_t)n;
 		}
-		return out_;
+		return fresh;
 	}
 
 	size_t strokes_tested_last() const { return tested_; }
@@ -189,6 +200,7 @@ private:
 	};
 	struct Hit {
 		double d2;
+		size_t other;
 		double p[3];
 	};
 
@@ -213,14 +225,12 @@ private:
 		points_.clear();
 		counts_.clear();
 		strokes_.clear();
-		out_.clear();
 	}
 
 	double proximity_ = -1.0;
 	std::vector<float> points_;
 	std::vector<int32_t> counts_;
 	std::vector<Stroke> strokes_;
-	std::vector<double> out_;
 	size_t tested_ = 0;
 };
 
