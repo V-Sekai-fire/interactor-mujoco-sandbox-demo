@@ -1,0 +1,24 @@
+name: crossings
+
+on:
+  pull_request:
+    paths:
+      - "guest/crossings.h"
+      - "tools/crossings/**"
+      - ".github/workflows/crossings.yml"
+  push:
+    branches: [main]
+    paths:
+      - "guest/crossings.h"
+      - "tools/crossings/**"
+      - ".github/workflows/crossings.yml"
+
+jobs:
+  host-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the crossings host test
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -I guest tools/crossings/crossings_test.cpp -o crossings_test
+          ./crossings_test
