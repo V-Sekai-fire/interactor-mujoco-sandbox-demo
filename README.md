@@ -4,7 +4,7 @@ A physics library built as a RISC-V guest program that an engine project loads i
 
 ## What it is for
 
-The host owns the tick: every step happens because the script asked for one, so a run repeats bit for bit on any machine. The guest answers stroke-crossing queries for the curve network and holds a scene's colliders for the ray and contact queries a walking player needs. RFD 2274 owns the crossings design.
+The host owns the tick: every step happens because the script asked for one, so a run repeats bit for bit on any machine. The guest answers stroke-crossing queries for the curve network and holds a scene's colliders for the ray and contact queries a walking player needs. RFD66606-2274 owns the crossings design.
 
 ## Build and run
 
