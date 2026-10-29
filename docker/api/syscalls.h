@@ -135,7 +135,7 @@
 // Returns bool in a0. Append-only ABI.
 #define ECALL_OBJ_USES_TRAIT (GAME_API_BASE + 63)
 
-// Array elements in bulk. a0 = Array scoped index, a1 = first element,
+// Array elements in bulk. a0 = Array or Packed*Array scoped index, a1 = first element,
 // a2 = maximum count, a3 = GuestVariant output buffer. The host fills up to
 // that many consecutive guest slots and returns the count actually written.
 #define ECALL_ARRAY_BATCH (GAME_API_BASE + 64)
@@ -147,7 +147,10 @@
 
 #define ECALL_VARIANT_SET (GAME_API_BASE + 66)
 
-#define ECALL_LAST (GAME_API_BASE + 67)
+// Raw elements of a typed or packed array
+#define ECALL_ARRAY_WINDOW (GAME_API_BASE + 67)
+
+#define ECALL_LAST (GAME_API_BASE + 68)
 
 #define STRINGIFY_HELPER(x) #x
 #define STRINGIFY(x) STRINGIFY_HELPER(x)
@@ -283,6 +286,12 @@ enum class Dictionary_Op {
 	GET_INT_KEY,
 	SET_INT_KEY,
 	HAS_INT_KEY,
+	// d[key] op= value in place. a4 = operand, a5 = Variant::Operator.
+	// Key encoding matches SET/SET_INT_KEY/SET_RAW/SET_RAW_STR.
+	OPERATE,
+	OPERATE_INT_KEY,
+	OPERATE_RAW,
+	OPERATE_RAW_STR,
 };
 
 enum class String_Op {
