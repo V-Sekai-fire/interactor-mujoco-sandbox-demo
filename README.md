@@ -38,7 +38,7 @@ The last `Squashed '<path>/'` commit on a path names the content that was taken.
 
 Three refs are split branches of their repository rather than the repository itself, because the content sits in a subdirectory: `program/cpp`, `bin/addons/godot_sandbox` and `addons/vsekai_godot_mcp`. `git subtree split` cannot make those splits here, since it skips every commit after a subtree merge with a different prefix and those repositories carry such merges; the branch is made with `git filter-branch --subdirectory-filter <dir>` and pushed.
 
-`third_party/sandbox-api` carries three changes of this repository's own on top of its subtree: the `.sandbox_variant` marker, the fork's syscall ids, and the dropped packed-array calls. A pull merges them rather than replacing them. That copy is behind the fork's `main`; moving it forward is a change of its own, because it rebuilds the committed guest programs. `project/addons/godot_sandbox` likewise carries the release's built libraries, compiler ELF, licence files and `.uid` sidecars, which the source directory does not hold.
+`third_party/sandbox-api` carries three changes of this repository's own on top of its subtree: the `.sandbox_variant` marker, the fork's syscall ids, and the dropped packed-array calls. A pull merges them rather than replacing them. That copy is behind the fork's `main`; moving it forward is a change of its own, because it rebuilds the committed guest programs. `project/addons/godot_sandbox` likewise carries what the release ships and the source directory does not hold: the built libraries, the compiler ELF, the licence files, the `.uid` sidecars, and the `linux.arm64` and macOS entries in `bin/godot-riscv.gdextension`.
 
 ## Licence
 
