@@ -15,6 +15,31 @@ The import registers the sandbox extension on a fresh clone.
 
 To rebuild the guest, configure `guest/` with CMake, using `third_party/riscv64-sysroot/toolchain.cmake` as the toolchain file, and copy the built `mjstep` program to `project/plans/mujoco.elf`, the path the host loads.
 
+## Vendored dependencies
+
+Every dependency is a squashed git subtree, so a clone needs no submodule step and a refresh is one command:
+
+    git subtree pull --prefix=<path> https://github.com/<repository> <ref> --squash
+
+| Path | Repository | Ref | Licence |
+|---|---|---|---|
+| `third_party/doctest` | doctest/doctest | `master` (vendored at `ae7a135`) | MIT |
+| `third_party/riscv64-mujoco` | V-Sekai-archive/repository-riscv64-mujoco | `main/main` | Apache-2.0 |
+| `third_party/riscv64-sysroot` | V-Sekai-fire/repository-riscv64-sysroot | `main` | LGPL-2.1-or-later, GPL-3.0-with-GCC-exception |
+| `third_party/sandbox-api` | V-Sekai-fire/godot-sandbox | `subtree/program-cpp` | BSD-3-Clause |
+| `third_party/witness-cpp` | V-Sekai-fire/repository-witness-cpp | `main` | MIT |
+| `project/addons/canvas_plane` | V-Sekai/canvas_plane | `main` | MIT |
+| `project/addons/distance_field_outlines` | pink-arcana/godot-distance-field-outlines | `main` | MIT |
+| `project/addons/godot_sandbox` | V-Sekai-fire/godot-sandbox | `subtree/bin-addons-godot-sandbox` | BSD-3-Clause |
+| `project/addons/interaction_system` | V-Sekai-archive/entities-multiplayer-fabric-interaction-system | `main` | MIT |
+| `project/addons/vsekai_godot_mcp` | V-Sekai-fire/transport-godot-mcp | `subtree/addons-vsekai-godot-mcp` | MIT |
+
+The last `Squashed '<path>/'` commit on a path names the content that was taken.
+
+Three refs are split branches of their repository rather than the repository itself, because the content sits in a subdirectory: `program/cpp`, `bin/addons/godot_sandbox` and `addons/vsekai_godot_mcp`. `git subtree split` cannot make those splits here, since it skips every commit after a subtree merge with a different prefix and those repositories carry such merges; the branch is made with `git filter-branch --subdirectory-filter <dir>` and pushed.
+
+`third_party/sandbox-api` carries three changes of this repository's own on top of its subtree: the `.sandbox_variant` marker, the fork's syscall ids, and the dropped packed-array calls. A pull merges them rather than replacing them. That copy is behind the fork's `main`; moving it forward is a change of its own, because it rebuilds the committed guest programs. `project/addons/godot_sandbox` likewise carries the release's built libraries, compiler ELF, licence files and `.uid` sidecars, which the source directory does not hold.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE). Vendored projects under `third_party/` carry their own licences.
