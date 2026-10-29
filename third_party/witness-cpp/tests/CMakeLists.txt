@@ -57,6 +57,7 @@ if(MSVC)
 else()
 	target_compile_options(witness_lib_tests PRIVATE -Wall -Wextra -Werror)
 endif()
+target_compile_definitions(witness_lib_tests PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
 
 include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
 doctest_discover_tests(witness_lib_tests)
