@@ -1,9 +1,8 @@
 # The riscv64-linux-gnu sysroot, by pinned Debian package.
 #
-# Fetched and verified rather than vendored: glibc is LGPL and libstdc++ is
-# GPL-3 with the runtime exception, so committing the binaries here would be
-# redistribution and would carry a source-offer obligation. A pin plus a hash
-# reproduces the same bytes without taking that on.
+# The committed sysroot/ is extracted from these packages. Their source
+# packages, on deb.debian.org and its archive, are the corresponding sources
+# the redistributed binaries point to.
 #
 # Format: <package> <version> <sha256> <size> <path under deb.debian.org/debian/>
 
