@@ -27,6 +27,8 @@ func _init() -> void:
 	if args.size() < 1 or args.size() > 2 or (args.size() == 2 and not plant):
 		_fail("usage: -- <mujoco.elf> [--plant-held]")
 		return
+	if ClassDB.class_has_method("Sandbox", "set_jit_enabled"):
+		ClassDB.class_call_static("Sandbox", "set_jit_enabled", false)
 	var sb = ClassDB.instantiate("Sandbox")
 	if sb == null:
 		_fail("Sandbox class missing")
