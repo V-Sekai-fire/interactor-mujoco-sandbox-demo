@@ -345,6 +345,24 @@ static Variant mjc_digest() {
 }
 
 // Body count including the world body at index 0.
+static Variant mjc_state() {
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(std::vector<double>());
+	}
+	std::vector<double> state(mj_stateSize(g_model, mjSTATE_INTEGRATION));
+	mj_getState(g_model, g_data, state.data(), mjSTATE_INTEGRATION);
+	return PackedArray<double>(state);
+}
+
+static Variant mjc_set_state(PackedArray<double> state) {
+	const std::vector<double> s = state.fetch();
+	if (g_model == nullptr || g_data == nullptr || (int)s.size() != mj_stateSize(g_model, mjSTATE_INTEGRATION)) {
+		return false;
+	}
+	mj_setState(g_model, g_data, s.data(), mjSTATE_INTEGRATION);
+	return true;
+}
+
 static Variant mjc_nbody() {
 	return g_model == nullptr ? 0 : (int)g_model->nbody;
 }
@@ -724,6 +742,8 @@ int main() {
 	ADD_API_FUNCTION(mjc_pivots, "PackedFloat64Array", "", "Per joint: anchor x, anchor z, pendulum length");
 	ADD_API_FUNCTION(mjc_time, "float", "", "Simulated time");
 	ADD_API_FUNCTION(mjc_qpos, "PackedFloat64Array", "", "Generalised positions");
+	ADD_API_FUNCTION(mjc_state, "PackedFloat64Array", "", "The full integration state, which mjc_digest hashes");
+	ADD_API_FUNCTION(mjc_set_state, "bool", "PackedFloat64Array state", "Replace the full integration state; false if the size is wrong");
 	ADD_API_FUNCTION(mjc_digest, "int", "", "Digest of the full integration state");
 	ADD_API_FUNCTION(mjc_lowest_mm, "float", "", "Lowest body height in millimetres");
 	ADD_API_FUNCTION(mjc_load_primitives, "int", "PackedFloat64Array prims, PackedFloat64Array grid, int nrow, int ncol, PackedFloat64Array hsize", "Load station colliders, terrain and the player capsule; returns the geom count or -1");
