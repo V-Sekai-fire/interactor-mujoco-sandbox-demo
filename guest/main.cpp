@@ -398,6 +398,77 @@ static Variant mjc_ngeom() {
 	return g_model == nullptr ? 0 : (int)g_model->ngeom;
 }
 
+// Every tendon's path for the selected person, as the last forward pass left it. Flat, per tendon
+// in id order: the number of path points, the tendon's length, then that many world-space x, y, z.
+// Consecutive points join as the engine's own renderer joins them: a straight segment, which over a
+// wrapping geom is the chord between the two points on its surface, so the polyline is never longer
+// than the length. A pulley ends one branch and starts the next; its point is three NaN and no
+// segment touches it.
+static Variant mjc_tendon_paths() {
+	std::vector<double> out;
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(out);
+	}
+	for (int i = 0; i < g_model->ntendon; i++) {
+		const int adr = g_data->ten_wrapadr[i];
+		const int num = g_data->ten_wrapnum[i];
+		out.push_back((double)num);
+		out.push_back(g_data->ten_length[i]);
+		for (int j = adr; j < adr + num; j++) {
+			const bool pulley = g_data->wrap_obj[j] == -2;
+			for (int k = 0; k < 3; k++) {
+				out.push_back(pulley ? (double)NAN : (double)g_data->wrap_xpos[j * 3 + k]);
+			}
+		}
+	}
+	return PackedArray<double>(out);
+}
+
+// Per tendon, 1 when the model's path for it names a wrapping sphere or cylinder, else 0. Such a
+// tendon may run over a surface, and then its length is more than its polyline.
+static Variant mjc_tendon_wraps() {
+	std::vector<int32_t> out;
+	for (int i = 0; g_model != nullptr && i < g_model->ntendon; i++) {
+		int32_t wraps = 0;
+		const int adr = g_model->tendon_adr[i];
+		for (int j = adr; j < adr + g_model->tendon_num[i]; j++) {
+			if (g_model->wrap_type[j] == mjWRAP_SPHERE || g_model->wrap_type[j] == mjWRAP_CYLINDER) {
+				wraps = 1;
+			}
+		}
+		out.push_back(wraps);
+	}
+	return PackedArray<int32_t>(out);
+}
+
+// What mjc_geoms leaves out for a host that sorts geoms by body and by collision: 13 doubles a
+// geom, in id order: body id, type, contype, conaffinity, three sizes, world position, and the
+// world z axis of the geom's frame, which is the long axis of a capsule or cylinder.
+static Variant mjc_geom_table() {
+	std::vector<double> out;
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(out);
+	}
+	out.reserve((size_t)g_model->ngeom * 13);
+	for (int i = 0; i < g_model->ngeom; i++) {
+		out.push_back((double)g_model->geom_bodyid[i]);
+		out.push_back((double)g_model->geom_type[i]);
+		out.push_back((double)g_model->geom_contype[i]);
+		out.push_back((double)g_model->geom_conaffinity[i]);
+		for (int k = 0; k < 3; k++) {
+			out.push_back(g_model->geom_size[i * 3 + k]);
+		}
+		for (int k = 0; k < 3; k++) {
+			out.push_back(g_data->geom_xpos[i * 3 + k]);
+		}
+		// geom_xmat is row-major, so the frame's z axis is its third column.
+		for (int k = 0; k < 3; k++) {
+			out.push_back(g_data->geom_xmat[i * 9 + k * 3 + 2]);
+		}
+	}
+	return PackedArray<double>(out);
+}
+
 // Which hinge a later mjc_hold applies to. Split from the angle because a
 // two-Variant guest function faults on the way in; one argument each works.
 static int g_held = -1;
@@ -676,5 +747,8 @@ int main() {
 	ADD_API_FUNCTION(mjc_ray_group, "PackedFloat64Array", "PackedFloat64Array origin, PackedFloat64Array dir, float maxdist, int exclude_body, int group", "Nearest hit within one geom group (1 is walkable)");
 	ADD_API_FUNCTION(mjc_player_band, "bool", "float radius, float bottom, float top", "Make the next load's player a vertical cylinder over [bottom, top]");
 	ADD_API_FUNCTION(mjc_player_contacts, "PackedFloat64Array", "", "Player contacts: other geom, normal xyz into the player, dist");
+	ADD_API_FUNCTION(mjc_tendon_paths, "PackedFloat64Array", "", "Per tendon: point count, length, then count world x,y,z; a pulley's point is NaN");
+	ADD_API_FUNCTION(mjc_tendon_wraps, "PackedInt32Array", "", "Per tendon: 1 if its path names a wrapping sphere or cylinder, else 0");
+	ADD_API_FUNCTION(mjc_geom_table, "PackedFloat64Array", "", "Geoms, stride 13: body id, type, contype, conaffinity, size xyz, world pos xyz, world z axis xyz");
 	halt();
 }
