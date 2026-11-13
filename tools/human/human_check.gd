@@ -1,14 +1,5 @@
 extends SceneTree
 
-## Gate for the MS-Human-700 model the guest builds from its embedded tree. Run from project/:
-##   godot --headless --path . -s ../tools/human/human_check.gd -- <mujoco.elf> [--withhold-rib] [--plant-held] [--qpos <file>]
-## Checks: the sizes of the free-root model, every joint name of the retargeted clips, the total
-## mass, the meshes the build kept against the embedded ones, and that the forward pass's own
-## acceleration comes back from the inverse as the muscles' own passive force and nothing more,
-## on two people who share the model.
-## Controls: --withhold-rib leaves one rib mesh out of the build, which must then fail, and
-## --plant-held feeds the held torque to the inverse check. --qpos reads 86 numbers, one per
-## line, as the pose; without it the pose is the model's own.
 
 const MASS_KG := 60.22  # MS-Human-700 as published, to 0.01 kg
 const RATIO_MAX := 1e-6  # residual over the holding force
@@ -46,7 +37,6 @@ func _init() -> void:
 	sb.set_memory_max(1024)
 	sb.set_allocations_max(1 << 22)
 	sb.set_unboxed_arguments(true)
-	# The model build runs past the default budget of one call.
 	sb.set("execution_timeout", 4000000)
 	sb.load_buffer(FileAccess.get_file_as_bytes(args[0]))
 	if not sb.has_function("mjc_load_human"):
@@ -64,7 +54,6 @@ func _init() -> void:
 			_fail("control: no rib mesh among the embedded files")
 			return
 	var t0 := Time.get_ticks_usec()
-	# Untyped: a call that throws inside the guest answers null, and the gate must still end.
 	var loaded = sb.vmcall("mjc_load_human", withhold)
 	var load_ms := (Time.get_ticks_usec() - t0) / 1000.0
 	if loaded != true:
@@ -115,7 +104,6 @@ func _init() -> void:
 			return
 		pose = args[at + 1].get_file()
 
-	# Two people on one model: the second holds the pose, the first stays as loaded.
 	var zero := PackedFloat64Array()
 	zero.resize(nv)
 	var residual := 0.0

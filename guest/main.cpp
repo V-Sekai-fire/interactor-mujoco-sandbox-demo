@@ -57,12 +57,10 @@ static mjModel *g_model = nullptr;
 static mjData *g_data = nullptr;
 static std::vector<unsigned char> g_buffer;
 
-// One model can serve several people, each with its own data. g_data is the selected one.
 static std::vector<mjData *> g_people;
 static std::string g_human_error;
 static std::vector<std::string> g_human_kept;
 
-// Frees every person's data but the selected one, which the loaders free themselves.
 static void free_people() {
 	for (mjData *d : g_people) {
 		if (d != g_data) {
@@ -144,8 +142,6 @@ static bool load_xml_text(const char *text, int len) {
 }
 
 
-
-
 // The model the guest ships with, needing nothing from the host.
 static Variant mjc_load_builtin() {
 	return load_xml_text(MODEL_XML, (int)sizeof(MODEL_XML));
@@ -161,8 +157,6 @@ static Variant mjc_load_xml(PackedArray<uint8_t> xml) {
 	return load_xml_text((const char *)v.data(), (int)v.size());
 }
 
-// MS-Human-700 from the tree embedded in this guest, with a free root and a floor. `withhold` is
-// the index of one embedded file to leave out, or -1; see human.h.
 static Variant mjc_load_human(int withhold) {
 	free_people();
 	if (g_data != nullptr) {
@@ -200,8 +194,6 @@ static Variant mjc_human_kept() {
 	return PackedArray<std::string>(g_human_kept);
 }
 
-// Selects which person's data every other call reads and writes. Data for a new index is made at
-// the model's default pose. At most 8 people.
 static Variant mjc_person(int index) {
 	if (g_model == nullptr || g_data == nullptr || index < 0 || index >= 8) {
 		return false;
@@ -221,8 +213,6 @@ static Variant mjc_person(int index) {
 	return true;
 }
 
-// Names of every object of one mjtObj type, in id order: 1 body, 3 joint, 5 geom, 7 mesh,
-// 18 tendon, 19 actuator. An unnamed object gives an empty string.
 static Variant mjc_names(int objtype) {
 	std::vector<std::string> out;
 	if (g_model == nullptr) {
@@ -245,7 +235,6 @@ static Variant mjc_names(int objtype) {
 	return PackedArray<std::string>(out);
 }
 
-// Total mass of the model in kilograms.
 static Variant mjc_mass() {
 	double mass = 0.0;
 	for (int i = 0; g_model != nullptr && i < g_model->nbody; i++) {
@@ -416,12 +405,6 @@ static Variant mjc_ngeom() {
 	return g_model == nullptr ? 0 : (int)g_model->ngeom;
 }
 
-// Every tendon's path for the selected person, as the last forward pass left it. Flat, per tendon
-// in id order: the number of path points, the tendon's length, then that many world-space x, y, z.
-// Consecutive points join as the engine's own renderer joins them: a straight segment, which over a
-// wrapping geom is the chord between the two points on its surface, so the polyline is never longer
-// than the length. A pulley ends one branch and starts the next; its point is three NaN and no
-// segment touches it.
 static Variant mjc_tendon_paths() {
 	std::vector<double> out;
 	if (g_model == nullptr || g_data == nullptr) {
@@ -442,8 +425,6 @@ static Variant mjc_tendon_paths() {
 	return PackedArray<double>(out);
 }
 
-// Per tendon, 1 when the model's path for it names a wrapping sphere or cylinder, else 0. Such a
-// tendon may run over a surface, and then its length is more than its polyline.
 static Variant mjc_tendon_wraps() {
 	std::vector<int32_t> out;
 	for (int i = 0; g_model != nullptr && i < g_model->ntendon; i++) {
@@ -459,9 +440,6 @@ static Variant mjc_tendon_wraps() {
 	return PackedArray<int32_t>(out);
 }
 
-// What mjc_geoms leaves out for a host that sorts geoms by body and by collision: 13 doubles a
-// geom, in id order: body id, type, contype, conaffinity, three sizes, world position, and the
-// world z axis of the geom's frame, which is the long axis of a capsule or cylinder.
 static Variant mjc_geom_table() {
 	std::vector<double> out;
 	if (g_model == nullptr || g_data == nullptr) {
@@ -479,7 +457,6 @@ static Variant mjc_geom_table() {
 		for (int k = 0; k < 3; k++) {
 			out.push_back(g_data->geom_xpos[i * 3 + k]);
 		}
-		// geom_xmat is row-major, so the frame's z axis is its third column.
 		for (int k = 0; k < 3; k++) {
 			out.push_back(g_data->geom_xmat[i * 9 + k * 3 + 2]);
 		}
@@ -655,8 +632,6 @@ static Variant mjc_qacc() {
 	return PackedArray<double>(a);
 }
 
-// Generalised forces of the actuators in the last forward pass. A muscle pulls passively at zero
-// control, so on a muscle model the inverse of the forward acceleration returns these, not zero.
 static Variant mjc_qfrc_actuator() {
 	if (g_model == nullptr || g_data == nullptr) {
 		return PackedArray<double>(std::vector<double>());
@@ -665,7 +640,6 @@ static Variant mjc_qfrc_actuator() {
 	return PackedArray<double>(f);
 }
 
-// Inverse dynamics at the set qpos and qvel. An empty reply means qacc was not nv long.
 static Variant mjc_inverse(PackedArray<double> qacc) {
 	const std::vector<double> a = qacc.fetch();
 	if (g_model == nullptr || g_data == nullptr || (int)a.size() != g_model->nv) {

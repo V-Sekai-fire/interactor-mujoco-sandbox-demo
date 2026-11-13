@@ -1,10 +1,5 @@
 extends SceneTree
 
-## Gate for mjc_inverse on the built-in cradle, drawn back and at rest. Run from project/:
-##   godot --headless --path . -s ../tools/inverse/inverse_check.gd -- <mujoco.elf> [--plant-held]
-## The forward pass's own acceleration must come back as no force. Two controls: zero
-## acceleration holds the ball, so a torque appears, and --plant-held feeds that to the gate,
-## which must fail; an array one short of nv must come back empty.
 
 const RATIO_MAX := 1e-6  # residual over the holding torque, both in N m
 

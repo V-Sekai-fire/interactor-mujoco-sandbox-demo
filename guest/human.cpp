@@ -5,15 +5,6 @@
 #include <cstdlib>
 #include <cstring>
 
-// The stock model is edited here and nowhere else, so no second copy of its XML exists:
-//   1. the six pelvis joints become one free joint named "root", as the retargeted clips expect;
-//   2. a floor plane is added;
-//   3. a mesh geom goes when it neither collides nor gives its body mass, and then every mesh,
-//      texture and material nothing refers to goes with it. A body without an <inertial> takes
-//      its mass from its geoms, so the meshes of such a body stay and no inertia is typed by hand;
-//   4. a mesh that stays is read here from OpenUSD text and given to the model as points and
-//      triangles. The stock XML names an STL or OBJ file; the embedded mesh has that name with
-//      .usda in its place, and MuJoCo's own mesh readers are not linked.
 namespace human {
 
 static const char *const PELVIS_JOINTS[] = { "pelvis_tz", "pelvis_ty", "pelvis_tx", "pelvis_tilt", "pelvis_list", "pelvis_rotation" };
@@ -26,7 +17,6 @@ std::vector<std::string> files() {
 	return out;
 }
 
-// "a/b/../c/d.stl" -> "a/c/d.stl".
 static std::string normal(const std::string &path) {
 	std::vector<std::string> parts;
 	size_t at = 0;
@@ -52,8 +42,6 @@ static std::string normal(const std::string &path) {
 	return out;
 }
 
-// The numbers of one array attribute of a .usda file, as text: what stands between "name = ["
-// and the closing bracket. nullptr when the attribute is absent.
 static const char *array_of(const char *begin, const char *end, const char *name, const char **stop) {
 	const std::string key = std::string(name) + " = [";
 	const char *at = begin;
@@ -72,7 +60,6 @@ static const char *array_of(const char *begin, const char *end, const char *name
 	return at;
 }
 
-// Reads the one Mesh of a .usda file written by tools/human/vendor.exs: every face a triangle.
 static bool read_usda(const unsigned char *data, const unsigned char *data_end, std::vector<float> &points, std::vector<int> &faces) {
 	const char *begin = (const char *)data;
 	const char *end = (const char *)data_end;
@@ -142,7 +129,6 @@ mjModel *build(int withhold, std::string &error, std::vector<std::string> &kept)
 	static mjVFS vfs;
 	mj_defaultVFS(&vfs);
 	for (int i = 0; i < HUMAN_FILE_COUNT; i++) {
-		// Only the XML files go to MuJoCo's reader: the meshes are read below.
 		const size_t length = strlen(HUMAN_FILES[i].name);
 		if (i == withhold || length < 4 || strcmp(HUMAN_FILES[i].name + length - 4, ".xml") != 0) {
 			continue;
@@ -163,7 +149,6 @@ mjModel *build(int withhold, std::string &error, std::vector<std::string> &kept)
 		return nullptr;
 	}
 
-	// 3. Mesh geoms that neither collide nor give mass.
 	std::vector<mjsElement *> gone;
 	std::vector<std::string> used;
 	for (mjsElement *e = mjs_firstElement(spec, mjOBJ_GEOM); e != nullptr; e = mjs_nextElement(spec, e)) {
@@ -187,7 +172,6 @@ mjModel *build(int withhold, std::string &error, std::vector<std::string> &kept)
 			found = found || u == name;
 		}
 		if (found) {
-			// The parser has already made the path relative to the model directory.
 			mjsMesh *mesh = mjs_asMesh(e);
 			std::string file = normal(mjs_getString(mesh->file));
 			const size_t dot = file.rfind('.');
@@ -222,7 +206,6 @@ mjModel *build(int withhold, std::string &error, std::vector<std::string> &kept)
 		gone.push_back(e);
 	}
 
-	// 1. The free root.
 	mjsBody *pelvis = mjs_findBody(spec, "pelvis");
 	if (pelvis == nullptr) {
 		error = "no pelvis body";
@@ -250,7 +233,6 @@ mjModel *build(int withhold, std::string &error, std::vector<std::string> &kept)
 	}
 	mjs_setName(mjs_addFreeJoint(pelvis)->element, "root");
 
-	// The keyframe is 85 values for the six-joint root, so it no longer fits the model.
 	gone.clear();
 	for (mjsElement *e = mjs_firstElement(spec, mjOBJ_KEY); e != nullptr; e = mjs_nextElement(spec, e)) {
 		gone.push_back(e);
@@ -259,7 +241,6 @@ mjModel *build(int withhold, std::string &error, std::vector<std::string> &kept)
 		mjs_delete(spec, e);
 	}
 
-	// 2. The floor.
 	mjsGeom *floor = mjs_addGeom(mjs_findBody(spec, "world"), nullptr);
 	mjs_setName(floor->element, "floor");
 	floor->type = mjGEOM_PLANE;

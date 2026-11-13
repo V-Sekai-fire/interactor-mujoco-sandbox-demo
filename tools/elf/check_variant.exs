@@ -1,8 +1,3 @@
-# The Variant size a committed guest was built for, read from its SBXV marker (SBXV + u32le).
-#   elixir tools/elf/check_variant.exs [--plant] <elf>=<24|40> ...
-# A single-precision engine loads 24 and a double-precision engine loads 40; either refuses the other.
-# --plant rewrites each marker to the other size in memory, and the check must then fail.
-# Exit 1 on any failure.
 defmodule CheckVariant do
   def main(argv) do
     {kv, pairs, _} = OptionParser.parse(argv, strict: [plant: :boolean])

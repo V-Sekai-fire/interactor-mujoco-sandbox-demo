@@ -1,12 +1,3 @@
-# Copies the part of MS-Human-700 the guest embeds, from a MuJoCo Menagerie checkout:
-#   elixir tools/human/vendor.exs <menagerie>/ms_human_700 <kept-meshes.txt>
-# The XML files are the ones MS-Human-700.xml reaches through <include>, followed here, and they
-# are copied unchanged. The meshes are the ones named in <kept-meshes.txt>, one path per line
-# relative to the model directory: the list the guest reports from mjc_human_kept after its own
-# rule ran (tools/human/human_check.gd compares the two). Each mesh is written as OpenUSD text
-# (.usda), the one mesh format the guest reads: a binary STL has its equal corners joined, as
-# MuJoCo's own reader does, and an OBJ file gives its first object as triangles. Writes
-# third_party/ms_human_700 and its FILES.txt, which CMake embeds.
 defmodule Vendor do
   @out "third_party/ms_human_700"
 
@@ -36,7 +27,6 @@ defmodule Vendor do
 
   def main(_), do: IO.puts(:stderr, "usage: vendor.exs <ms_human_700> <kept-meshes.txt>") || System.halt(1)
 
-  # An include is relative to the file that names it.
   defp reach(src, rel, seen) do
     if rel in seen do
       seen
@@ -57,7 +47,6 @@ defmodule Vendor do
     end
   end
 
-  # Binary STL: an 80 byte header, a count, then 50 bytes a triangle. Points stay 32-bit floats.
   defp read_stl(<<_::binary-size(80), count::little-32, rest::binary>>) do
     true = byte_size(rest) == count * 50
 
@@ -82,9 +71,6 @@ defmodule Vendor do
     {points, Enum.reverse(faces)}
   end
 
-  # Only the first object of an OBJ file is the mesh, as MuJoCo reads it: Rib1L.obj carries
-  # twelve. Its corners are renumbered to the points it uses. A quad is cut along its shorter
-  # diagonal and a larger polygon becomes a fan.
   defp read_obj(text) do
     lines = String.split(text, "\n", trim: true)
     all = for "v " <> rest <- lines, do: rest |> String.split() |> Enum.take(3) |> Enum.map(&number/1)
@@ -127,7 +113,6 @@ defmodule Vendor do
     end
   end
 
-  # The shortest text that reads back as the same number.
   defp usda(name, source, points, faces) do
     [
       "#usda 1.0\n(\n    defaultPrim = \"", name, "\"\n",
