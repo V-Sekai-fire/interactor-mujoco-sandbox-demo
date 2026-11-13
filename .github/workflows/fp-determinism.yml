@@ -14,6 +14,9 @@ on:
       - "tools/determinism/**"
       - "tools/inverse/**"
       - "tools/elf/**"
+      - "tools/density/**"
+      - "guest/**"
+      - "docs/**"
       - "tools/human/**"
       - "patches/**"
       - "third_party/**"
@@ -24,6 +27,9 @@ on:
       - "tools/determinism/**"
       - "tools/inverse/**"
       - "tools/elf/**"
+      - "tools/density/**"
+      - "guest/**"
+      - "docs/**"
       - "tools/human/**"
       - "patches/**"
       - "third_party/**"
@@ -39,9 +45,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Each committed guest carries the Variant size its engine loads: 24 for single precision, 40 for
-  # double. An engine of the other precision refuses the guest, so a wrong marker is a guest that
-  # never runs.
   variant:
     runs-on: ubuntu-latest
     steps:
@@ -50,6 +53,12 @@ jobs:
         with:
           otp-version: "27"
           elixir-version: "1.18"
+      - name: Comment density of the files this check covers
+        run: |
+          elixir tools/density/comment_density.exs guest/human.cpp guest/human.h guest/embed_tree.cmake \
+            tools/human/human_check.gd tools/human/tendon_check.gd tools/human/vendor.exs \
+            tools/elf/check_variant.exs tools/inverse/inverse_check.gd tools/determinism/state_check.gd \
+            tools/density/comment_density.exs
       - name: Variant size of the committed guests, and its planted control
         run: |
           set -e
@@ -73,7 +82,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- Build the extension natively (Linux and macOS legs) ---
       - name: Install build tools (Linux)
         if: matrix.build && runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang
@@ -97,7 +105,6 @@ jobs:
           cmake --build gs/build -j --target godot-riscv
           BIN=project/addons/godot_sandbox/bin
           if [ "$RUNNER_OS" = "macOS" ]; then
-            # The framework is committed without its binary; the name comes from its Info.plist.
             SO=$(find gs/build -name 'libgodot-riscv*.dylib' -o -name 'libgodot_riscv*.dylib' | head -1)
             test -n "$SO"
             cp "$SO" "$BIN/libgodot_riscv.macos.template_release.universal.framework/libgodot_riscv.macos.template_release.universal"
@@ -153,7 +160,6 @@ jobs:
           # Import once so the extension's classes register, then run the digest.
           # -s resolves relative to the CWD, so it must be run from project/.
           "$GODOT" --headless --path . --import 2>&1 | tail -3 || true
-          # The output is printed whether or not the engine fails, so a failure can be read.
           OUT=$("$GODOT" --headless --path . -s ../tools/determinism/digest.gd 2>&1) || true
           echo "$OUT"
           LINE=$(echo "$OUT" | grep -o 'DIGEST=[0-9-]* STEPS=[0-9]* NQ=[0-9]*' | head -1)
@@ -230,12 +236,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with: { path: digests, merge-multiple: true }
-      # Four hosts, so that one host that differs is outvoted by three and can be named. With
-      # three hosts and one wrong, a second fault could not be told from the first.
       - name: Four hosts must agree
         run: |
           set -e
-          # agree <dir>: 0 when the directory holds exactly four digests and they are one value.
           agree() {
             local dir="$1" count distinct major f
             count=$(ls "$dir"/digest-*.txt | wc -l)
@@ -258,7 +261,6 @@ jobs:
           for f in digests/digest-*.txt; do echo "$(basename "$f" .txt): $(cat "$f")"; done
           agree digests
 
-          # Control: one host's digest altered in a copy must fail, and that host must be named.
           cp -r digests plant
           odd=$(ls plant/digest-*.txt | head -1)
           echo "DIGEST=0 STEPS=0 NQ=0" > "$odd"
@@ -268,7 +270,6 @@ jobs:
           fi
           grep -q "^ODD: $(basename "$odd" .txt) " plant.log || { echo "FAIL: the altered host was not named"; cat plant.log; exit 1; }
 
-          # Control: three hosts in agreement are not enough.
           cp -r digests three
           rm "$(ls three/digest-*.txt | head -1)"
           if agree three > three.log; then
