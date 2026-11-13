@@ -182,6 +182,19 @@ jobs:
             exit 1
           fi
 
+      - name: State put back replays the run, and its control
+        shell: bash
+        run: |
+          set -e
+          GODOT="$GITHUB_WORKSPACE/godot"; [ -f "$GITHUB_WORKSPACE/godot.exe" ] && GODOT="$GITHUB_WORKSPACE/godot.exe"
+          cd project
+          gate() { "$GODOT" --headless --path . -s ../tools/determinism/state_check.gd -- plans/mujoco.elf "$@" 2>&1 | tee state.log; grep -q "^RESULT: PASS" state.log; }
+          gate
+          if gate --plant-state; then
+            echo "FAIL: the gate passed with one value of the state altered"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: digest-${{ matrix.os }}-${{ matrix.arch }}
