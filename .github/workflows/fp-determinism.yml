@@ -68,15 +68,19 @@ jobs:
           - { os: ubuntu-latest,     arch: x86_64, build: true }
           - { os: ubuntu-24.04-arm,  arch: arm64,  build: true }
           - { os: windows-latest,    arch: x86_64, build: false }  # reuse the committed DLL
-          - { os: macos-latest,      arch: arm64,  build: false }  # reuse the committed framework
+          - { os: macos-latest,      arch: arm64,  build: true }   # the committed framework holds no binary
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      # --- Build the extension natively (Linux legs) ---
+      # --- Build the extension natively (Linux and macOS legs) ---
       - name: Install build tools (Linux)
-        if: matrix.build
+        if: matrix.build && runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build clang
+
+      - name: Install build tools (macOS)
+        if: matrix.build && runner.os == 'macOS'
+        run: brew install ninja
 
       - name: Build the sandbox extension from the fork
         if: matrix.build
@@ -91,14 +95,23 @@ jobs:
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
             -DENABLE_SAFEGDSCRIPT=OFF -DRISCV_BINARY_TRANSLATION=OFF
           cmake --build gs/build -j --target godot-riscv
-          SO=$(find gs/build -name 'libgodot-riscv*.so' -o -name 'libgodot_riscv*.so' | head -1)
-          test -n "$SO"
-          cp "$SO" "project/addons/godot_sandbox/bin/libgodot_riscv.linux.template_release.${{ matrix.arch }}.so"
-          echo "installed $SO -> linux ${{ matrix.arch }}"
+          BIN=project/addons/godot_sandbox/bin
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            # The framework is committed without its binary; the name comes from its Info.plist.
+            SO=$(find gs/build -name 'libgodot-riscv*.dylib' -o -name 'libgodot_riscv*.dylib' | head -1)
+            test -n "$SO"
+            cp "$SO" "$BIN/libgodot_riscv.macos.template_release.universal.framework/libgodot_riscv.macos.template_release.universal"
+            echo "installed $SO -> macos ${{ matrix.arch }}"
+          else
+            SO=$(find gs/build -name 'libgodot-riscv*.so' -o -name 'libgodot_riscv*.so' | head -1)
+            test -n "$SO"
+            cp "$SO" "$BIN/libgodot_riscv.linux.template_release.${{ matrix.arch }}.so"
+            echo "installed $SO -> linux ${{ matrix.arch }}"
+          fi
 
       # --- Godot ---
       - name: Get Godot (Linux)
-        if: matrix.build
+        if: runner.os == 'Linux'
         run: |
           set -e
           case "${{ matrix.arch }}" in
@@ -140,7 +153,8 @@ jobs:
           # Import once so the extension's classes register, then run the digest.
           # -s resolves relative to the CWD, so it must be run from project/.
           "$GODOT" --headless --path . --import 2>&1 | tail -3 || true
-          OUT=$("$GODOT" --headless --path . -s ../tools/determinism/digest.gd 2>&1)
+          # The output is printed whether or not the engine fails, so a failure can be read.
+          OUT=$("$GODOT" --headless --path . -s ../tools/determinism/digest.gd 2>&1) || true
           echo "$OUT"
           LINE=$(echo "$OUT" | grep -o 'DIGEST=[0-9-]* STEPS=[0-9]* NQ=[0-9]*' | head -1)
           test -n "$LINE"
