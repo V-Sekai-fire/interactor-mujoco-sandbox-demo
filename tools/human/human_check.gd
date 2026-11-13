@@ -82,7 +82,7 @@ func _init() -> void:
 		_fail("mass %.4f kg against %.2f kg" % [mass, MASS_KG])
 		return
 
-	var want := FileAccess.get_file_as_string(get_script().resource_path.get_base_dir().path_join("clip_joints.txt")).split("\n", false)
+	var want := FileAccess.get_file_as_string(get_script().resource_path.get_base_dir().path_join("clip_joints.txt")).replace("\r", "").split("\n", false)
 	var missing := PackedStringArray()
 	for name in want:
 		if not joints.has(name):
@@ -106,7 +106,7 @@ func _init() -> void:
 	var at := args.find("--qpos")
 	var qpos := PackedFloat64Array()
 	if at >= 0 and at + 1 < args.size():
-		for line in FileAccess.get_file_as_string(args[at + 1]).split("\n", false):
+		for line in FileAccess.get_file_as_string(args[at + 1]).replace("\r", "").split("\n", false):
 			qpos.append(line.to_float())
 		if qpos.size() != nq:
 			_fail("%s holds %d numbers against nq %d" % [args[at + 1], qpos.size(), nq])
