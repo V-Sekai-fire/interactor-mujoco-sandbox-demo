@@ -12,6 +12,8 @@ extends SceneTree
 const STEPS := 4000
 
 func _init() -> void:
+	if ClassDB.class_has_method("Sandbox", "set_jit_enabled"):
+		ClassDB.class_call_static("Sandbox", "set_jit_enabled", false)
 	var sb = ClassDB.instantiate("Sandbox")
 	if sb == null:
 		printerr("DETERMINISM: Sandbox class missing (extension not loaded?)")

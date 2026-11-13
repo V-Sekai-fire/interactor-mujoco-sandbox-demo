@@ -37,6 +37,8 @@ func _init() -> void:
 		return
 	var withhold_rib := args.has("--withhold-rib")
 	var plant := args.has("--plant-held")
+	if ClassDB.class_has_method("Sandbox", "set_jit_enabled"):
+		ClassDB.class_call_static("Sandbox", "set_jit_enabled", false)
 	var sb = ClassDB.instantiate("Sandbox")
 	if sb == null:
 		_fail("Sandbox class missing")
