@@ -1,14 +1,5 @@
 extends SceneTree
 
-## Gate for the tendon paths and the geom table of the MS-Human-700 model. Run from project/:
-##   godot --headless --path . -s ../tools/human/tendon_check.gd -- <mujoco.elf> [--plant-swap] [--plant-geom]
-## Checks: 700 tendons, each with two points or more; a polyline never longer than its tendon; a
-## tendon whose path names no wrapping geom exactly as long as its polyline; one geom row a geom,
-## each on a body the model has; the floor plane; and the measured counts of wrapping tendons,
-## colliding geoms and mesh geoms.
-## Controls: --plant-swap exchanges the points of two tendons of different length that wrap
-## nothing, which trips the equality of polyline and length, and --plant-geom puts one geom on a
-## body the model does not have. Each must fail.
 
 const TENDONS := 700
 const WRAPPING := 160  # tendons whose path names a wrapping sphere or cylinder
@@ -28,7 +19,6 @@ func _fail(msg: String) -> void:
 	quit(1)
 
 
-## Sum of the segments of one tendon's points. A pulley's point is NaN and no segment touches it.
 func _polyline(points: PackedFloat64Array) -> float:
 	var total := 0.0
 	for k in range(3, points.size(), 3):
@@ -57,7 +47,6 @@ func _init() -> void:
 	sb.set_memory_max(1024)
 	sb.set_allocations_max(1 << 22)
 	sb.set_unboxed_arguments(true)
-	# The model build runs past the default budget of one call.
 	sb.set("execution_timeout", 4000000)
 	sb.load_buffer(FileAccess.get_file_as_bytes(args[0]))
 	for call in ["mjc_load_human", "mjc_tendon_paths", "mjc_tendon_wraps", "mjc_geom_table"]:
@@ -65,7 +54,6 @@ func _init() -> void:
 			_fail("%s has no %s" % [args[0], call])
 			return
 
-	# Untyped: a call that throws inside the guest answers null, and the gate must still end.
 	var loaded = sb.vmcall("mjc_load_human", -1)
 	if loaded != true:
 		_fail("the model did not build: %s" % str(sb.vmcall("mjc_human_error")))
@@ -100,7 +88,6 @@ func _init() -> void:
 		return
 
 	if plant_swap:
-		# Two tendons that wrap nothing, so the swap meets the check that asks for equality.
 		var first: int = wraps.find(0)
 		var other := -1
 		for i in range(first + 1, TENDONS):
@@ -129,7 +116,6 @@ func _init() -> void:
 		if not is_finite(poly) or not is_finite(lengths[i]) or lengths[i] <= 0.0:
 			_fail("tendon %d has length %s and polyline %s" % [i, str(lengths[i]), str(poly)])
 			return
-		# Equality first where it holds: it is the stricter of the two and the one the swap is for.
 		if wraps[i] == 0:
 			worst = maxf(worst, absf(poly - lengths[i]) / lengths[i])
 			if absf(poly - lengths[i]) > TOLERANCE * lengths[i]:

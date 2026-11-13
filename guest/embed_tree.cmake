@@ -1,5 +1,3 @@
-# Embeds every file named in <dir>/FILES.txt into the guest: a C file whose assembly includes
-# the bytes, and a header with one table of name, begin and end. The first row is the main model file.
 function(embed_tree dir out_asm out_header)
 	file(STRINGS "${dir}/FILES.txt" _files)
 	set(_asm "__asm__(\"\\t.section .rodata\\n\"\n")

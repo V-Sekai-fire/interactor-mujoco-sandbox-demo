@@ -12,9 +12,6 @@ if(EXISTS "${_runtime_api}/docker/api/api.cpp")
 else()
 	set(SANDBOX_API "${DEMO_ROOT}/third_party/sandbox-api" CACHE PATH "godot-sandbox guest API checkout")
 endif()
-# A double-precision guest needs an API whose library carries the definition too: the Variant size
-# marker is compiled there. The vendored copy defines it on the program only and its sources assert
-# the single-precision sizes, so it would link a guest that a double engine refuses to load.
 if(DOUBLE_PRECISION)
 	file(STRINGS "${SANDBOX_API}/cmake/CMakeLists.txt" _api_double REGEX "sandbox_api PUBLIC DOUBLE_PRECISION_REAL_T")
 	if(NOT _api_double)
@@ -38,7 +35,6 @@ add_custom_command(
 			"${DEMO_ROOT}/scripts/embed_model.py"
 	COMMENT "Embedding newtons_cradle.xml into the guest")
 
-# MS-Human-700, embedded as its stock XML tree and the meshes its model build keeps.
 include("${CMAKE_CURRENT_LIST_DIR}/embed_tree.cmake")
 embed_tree("${DEMO_ROOT}/third_party/ms_human_700" "${CMAKE_CURRENT_BINARY_DIR}/human_files.c" "${CMAKE_CURRENT_BINARY_DIR}/human_files.h")
 
