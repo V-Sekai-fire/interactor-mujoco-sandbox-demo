@@ -14,6 +14,7 @@ on:
       - "tools/determinism/**"
       - "tools/inverse/**"
       - "tools/elf/**"
+      - "tools/human/**"
       - "patches/**"
       - "third_party/**"
       - ".github/workflows/fp-determinism.yml"
@@ -23,6 +24,7 @@ on:
       - "tools/determinism/**"
       - "tools/inverse/**"
       - "tools/elf/**"
+      - "tools/human/**"
       - "patches/**"
       - "third_party/**"
       - ".github/workflows/fp-determinism.yml"
@@ -142,6 +144,23 @@ jobs:
           cd project
           "$GODOT" --headless --path . -s ../tools/inverse/inverse_check.gd -- plans/mujoco.elf
           if "$GODOT" --headless --path . -s ../tools/inverse/inverse_check.gd -- plans/mujoco.elf --plant-held; then
+            echo "FAIL: the gate passed with the held torque planted"
+            exit 1
+          fi
+
+      - name: MS-Human-700 model gate and its two controls
+        shell: bash
+        run: |
+          set -e
+          GODOT="$GITHUB_WORKSPACE/godot"; [ -f "$GITHUB_WORKSPACE/godot.exe" ] && GODOT="$GITHUB_WORKSPACE/godot.exe"
+          cd project
+          gate() { "$GODOT" --headless --path . -s ../tools/human/human_check.gd -- plans/mujoco.elf "$@" 2>&1 | tee human.log; grep -q "^RESULT: PASS" human.log; }
+          gate
+          if gate --withhold-rib; then
+            echo "FAIL: the gate passed with a rib mesh withheld"
+            exit 1
+          fi
+          if gate --plant-held; then
             echo "FAIL: the gate passed with the held torque planted"
             exit 1
           fi

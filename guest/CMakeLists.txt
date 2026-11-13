@@ -38,7 +38,12 @@ add_custom_command(
 			"${DEMO_ROOT}/scripts/embed_model.py"
 	COMMENT "Embedding newtons_cradle.xml into the guest")
 
-add_sandbox_program(${ELF_NAME} main.cpp station.cpp "${CMAKE_CURRENT_BINARY_DIR}/model_data.h")
+# MS-Human-700, embedded as its stock XML tree and the meshes its model build keeps.
+include("${CMAKE_CURRENT_LIST_DIR}/embed_tree.cmake")
+embed_tree("${DEMO_ROOT}/third_party/ms_human_700" "${CMAKE_CURRENT_BINARY_DIR}/human_files.c" "${CMAKE_CURRENT_BINARY_DIR}/human_files.h")
+
+add_sandbox_program(${ELF_NAME} main.cpp station.cpp human.cpp "${CMAKE_CURRENT_BINARY_DIR}/human_files.c"
+	"${CMAKE_CURRENT_BINARY_DIR}/model_data.h")
 target_include_directories(${ELF_NAME} PRIVATE "${MJ}/include" "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(${ELF_NAME} PRIVATE
 	"${MJ}/lib/libmujoco.a" "${MJ}/lib/libccd.a" "${MJ}/lib/libtinyxml2.a"
