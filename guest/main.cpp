@@ -14,6 +14,7 @@
 #include "model_data.h"
 #include "crossings.h"
 #include "station.h"
+#include "human.h"
 
 // Arguments are declared as native types, not Variant. The host unboxes them
 // into registers when unboxed arguments are on, and a Variant parameter then
@@ -56,6 +57,21 @@ static mjModel *g_model = nullptr;
 static mjData *g_data = nullptr;
 static std::vector<unsigned char> g_buffer;
 
+// One model can serve several people, each with its own data. g_data is the selected one.
+static std::vector<mjData *> g_people;
+static std::string g_human_error;
+static std::vector<std::string> g_human_kept;
+
+// Frees every person's data but the selected one, which the loaders free themselves.
+static void free_people() {
+	for (mjData *d : g_people) {
+		if (d != g_data) {
+			mj_deleteData(d);
+		}
+	}
+	g_people.clear();
+}
+
 static Variant mjc_version() {
 	return (int)mj_version();
 }
@@ -66,6 +82,7 @@ static Variant mjc_load(PackedArray<uint8_t> mjb) {
 		return false;
 	}
 
+	free_people();
 	if (g_data != nullptr) {
 		mj_deleteData(g_data);
 		g_data = nullptr;
@@ -86,6 +103,7 @@ static Variant mjc_load(PackedArray<uint8_t> mjb) {
 }
 
 static bool load_xml_text(const char *text, int len) {
+	free_people();
 	if (g_data != nullptr) {
 		mj_deleteData(g_data);
 		g_data = nullptr;
@@ -141,6 +159,99 @@ static Variant mjc_load_xml(PackedArray<uint8_t> xml) {
 		return false;
 	}
 	return load_xml_text((const char *)v.data(), (int)v.size());
+}
+
+// MS-Human-700 from the tree embedded in this guest, with a free root and a floor. `withhold` is
+// the index of one embedded file to leave out, or -1; see human.h.
+static Variant mjc_load_human(int withhold) {
+	free_people();
+	if (g_data != nullptr) {
+		mj_deleteData(g_data);
+		g_data = nullptr;
+	}
+	if (g_model != nullptr) {
+		mj_deleteModel(g_model);
+		g_model = nullptr;
+	}
+	g_human_error.clear();
+	g_human_kept.clear();
+	g_model = human::build(withhold, g_human_error, g_human_kept);
+	if (g_model == nullptr) {
+		return false;
+	}
+	g_data = mj_makeData(g_model);
+	if (g_data == nullptr) {
+		g_human_error = "no data";
+		return false;
+	}
+	mj_forward(g_model, g_data);
+	return true;
+}
+
+static Variant mjc_human_error() {
+	return PackedArray<std::string>(std::vector<std::string>{ g_human_error });
+}
+
+static Variant mjc_human_files() {
+	return PackedArray<std::string>(human::files());
+}
+
+static Variant mjc_human_kept() {
+	return PackedArray<std::string>(g_human_kept);
+}
+
+// Selects which person's data every other call reads and writes. Data for a new index is made at
+// the model's default pose. At most 8 people.
+static Variant mjc_person(int index) {
+	if (g_model == nullptr || g_data == nullptr || index < 0 || index >= 8) {
+		return false;
+	}
+	if (g_people.empty()) {
+		g_people.push_back(g_data);
+	}
+	while ((int)g_people.size() <= index) {
+		mjData *d = mj_makeData(g_model);
+		if (d == nullptr) {
+			return false;
+		}
+		mj_forward(g_model, d);
+		g_people.push_back(d);
+	}
+	g_data = g_people[index];
+	return true;
+}
+
+// Names of every object of one mjtObj type, in id order: 1 body, 3 joint, 5 geom, 7 mesh,
+// 18 tendon, 19 actuator. An unnamed object gives an empty string.
+static Variant mjc_names(int objtype) {
+	std::vector<std::string> out;
+	if (g_model == nullptr) {
+		return PackedArray<std::string>(out);
+	}
+	int count = 0;
+	switch (objtype) {
+		case mjOBJ_BODY: count = g_model->nbody; break;
+		case mjOBJ_JOINT: count = g_model->njnt; break;
+		case mjOBJ_GEOM: count = g_model->ngeom; break;
+		case mjOBJ_MESH: count = g_model->nmesh; break;
+		case mjOBJ_TENDON: count = g_model->ntendon; break;
+		case mjOBJ_ACTUATOR: count = g_model->nu; break;
+		default: break;
+	}
+	for (int i = 0; i < count; i++) {
+		const char *name = mj_id2name(g_model, objtype, i);
+		out.push_back(name == nullptr ? "" : name);
+	}
+	return PackedArray<std::string>(out);
+}
+
+// Total mass of the model in kilograms.
+static Variant mjc_mass() {
+	double mass = 0.0;
+	for (int i = 0; g_model != nullptr && i < g_model->nbody; i++) {
+		mass += g_model->body_mass[i];
+	}
+	return mass;
 }
 
 static Variant mjc_step() {
@@ -455,6 +566,16 @@ static Variant mjc_qacc() {
 	return PackedArray<double>(a);
 }
 
+// Generalised forces of the actuators in the last forward pass. A muscle pulls passively at zero
+// control, so on a muscle model the inverse of the forward acceleration returns these, not zero.
+static Variant mjc_qfrc_actuator() {
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(std::vector<double>());
+	}
+	const std::vector<double> f(g_data->qfrc_actuator, g_data->qfrc_actuator + g_model->nv);
+	return PackedArray<double>(f);
+}
+
 // Inverse dynamics at the set qpos and qvel. An empty reply means qacc was not nv long.
 static Variant mjc_inverse(PackedArray<double> qacc) {
 	const std::vector<double> a = qacc.fetch();
@@ -541,6 +662,14 @@ int main() {
 	ADD_API_FUNCTION(mjc_set_qvel, "bool", "PackedFloat64Array qvel", "Set every generalised velocity");
 	ADD_API_FUNCTION(mjc_forward, "bool", "", "Kinematics and collision without integrating");
 	ADD_API_FUNCTION(mjc_nv, "int", "", "Number of degrees of freedom");
+	ADD_API_FUNCTION(mjc_load_human, "bool", "int withhold", "Build MS-Human-700 from the embedded tree; withhold is one file index to leave out, or -1");
+	ADD_API_FUNCTION(mjc_human_error, "PackedStringArray", "", "Why the last mjc_load_human failed");
+	ADD_API_FUNCTION(mjc_human_files, "PackedStringArray", "", "Paths of the embedded model files");
+	ADD_API_FUNCTION(mjc_human_kept, "PackedStringArray", "", "Mesh files the built model reads");
+	ADD_API_FUNCTION(mjc_person, "bool", "int index", "Select one person's data on the loaded model, making it if new");
+	ADD_API_FUNCTION(mjc_names, "PackedStringArray", "int objtype", "Names of every object of one mjtObj type, in id order");
+	ADD_API_FUNCTION(mjc_mass, "float", "", "Total mass in kilograms");
+	ADD_API_FUNCTION(mjc_qfrc_actuator, "PackedFloat64Array", "", "Generalised actuator forces of the last forward pass");
 	ADD_API_FUNCTION(mjc_qacc, "PackedFloat64Array", "", "Generalised accelerations of the last forward pass");
 	ADD_API_FUNCTION(mjc_inverse, "PackedFloat64Array", "PackedFloat64Array qacc", "Inverse dynamics: generalised forces for qacc at the set qpos and qvel; empty if qacc is not nv long");
 	ADD_API_FUNCTION(mjc_mocap_set, "bool", "int index, PackedFloat64Array pose", "Place a mocap body at x,y,z,qw,qx,qy,qz");
