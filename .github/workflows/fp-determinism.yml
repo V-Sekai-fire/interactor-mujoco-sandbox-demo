@@ -189,6 +189,23 @@ jobs:
             exit 1
           fi
 
+      - name: Tendon path and geom table gate and its two controls
+        shell: bash
+        run: |
+          set -e
+          GODOT="$GITHUB_WORKSPACE/godot"; [ -f "$GITHUB_WORKSPACE/godot.exe" ] && GODOT="$GITHUB_WORKSPACE/godot.exe"
+          cd project
+          gate() { "$GODOT" --headless --path . -s ../tools/human/tendon_check.gd -- plans/mujoco.elf "$@" 2>&1 | tee tendon.log; grep -q "^RESULT: PASS" tendon.log; }
+          gate
+          if gate --plant-swap; then
+            echo "FAIL: the gate passed with two tendons' points swapped"
+            exit 1
+          fi
+          if gate --plant-geom; then
+            echo "FAIL: the gate passed with a geom on a body the model does not have"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: digest-${{ matrix.os }}-${{ matrix.arch }}
