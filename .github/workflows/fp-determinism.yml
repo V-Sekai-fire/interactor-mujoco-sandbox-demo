@@ -13,6 +13,7 @@ on:
       - "project/**"
       - "tools/determinism/**"
       - "tools/inverse/**"
+      - "tools/elf/**"
       - "patches/**"
       - "third_party/**"
       - ".github/workflows/fp-determinism.yml"
@@ -21,6 +22,7 @@ on:
       - "project/**"
       - "tools/determinism/**"
       - "tools/inverse/**"
+      - "tools/elf/**"
       - "patches/**"
       - "third_party/**"
       - ".github/workflows/fp-determinism.yml"
@@ -35,6 +37,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Each committed guest carries the Variant size its engine loads: 24 for single precision, 40 for
+  # double. An engine of the other precision refuses the guest, so a wrong marker is a guest that
+  # never runs.
+  variant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.18"
+      - name: Variant size of the committed guests, and its planted control
+        run: |
+          set -e
+          PAIRS="project/plans/mujoco.elf=24 project/plans/mujoco.double.elf=40"
+          elixir tools/elf/check_variant.exs $PAIRS
+          if elixir tools/elf/check_variant.exs --plant $PAIRS; then
+            echo "FAIL: the check passed with the markers planted at the other size"
+            exit 1
+          fi
+
   digest:
     strategy:
       fail-fast: false
