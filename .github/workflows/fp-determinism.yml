@@ -68,6 +68,7 @@ jobs:
           - { os: ubuntu-latest,     arch: x86_64, build: true }
           - { os: ubuntu-24.04-arm,  arch: arm64,  build: true }
           - { os: windows-latest,    arch: x86_64, build: false }  # reuse the committed DLL
+          - { os: macos-latest,      arch: arm64,  build: false }  # reuse the committed framework
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +112,7 @@ jobs:
           chmod +x godot
 
       - name: Get Godot (Windows)
-        if: ${{ !matrix.build }}
+        if: runner.os == 'Windows'
         shell: bash
         run: |
           set -e
@@ -119,6 +120,15 @@ jobs:
           curl -fL "$URL" -o godot.zip
           unzip -o godot.zip
           mv Godot_v${GODOT_VERSION}_win64.exe godot.exe
+
+      - name: Get Godot (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_macos.universal.zip"
+          curl -fL "$URL" -o godot.zip
+          unzip -q -o godot.zip
+          ln -s "$GITHUB_WORKSPACE/Godot.app/Contents/MacOS/Godot" godot
 
       # --- Import once (registers classes), then run the digest ---
       - name: Compute digest
@@ -176,14 +186,49 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with: { path: digests, merge-multiple: true }
-      - name: All platforms must agree
+      # Four hosts, so that one host that differs is outvoted by three and can be named. With
+      # three hosts and one wrong, a second fault could not be told from the first.
+      - name: Four hosts must agree
         run: |
           set -e
-          echo "=== per-platform digests ==="
-          cat digests/*.txt
-          UNIQUE=$(sort -u digests/*.txt | wc -l)
-          if [ "$UNIQUE" -ne 1 ]; then
-            echo "FAIL: the guest is not deterministic across platforms ($UNIQUE distinct digests)"
+          # agree <dir>: 0 when the directory holds exactly four digests and they are one value.
+          agree() {
+            local dir="$1" count distinct major f
+            count=$(ls "$dir"/digest-*.txt | wc -l)
+            if [ "$count" -ne 4 ]; then
+              echo "FAIL: $count digest files, and four hosts are required"
+              return 1
+            fi
+            distinct=$(sort -u "$dir"/digest-*.txt | wc -l)
+            if [ "$distinct" -eq 1 ]; then
+              return 0
+            fi
+            major=$(sort "$dir"/digest-*.txt | uniq -c | sort -rn | head -1 | sed 's/^ *[0-9]* //')
+            for f in "$dir"/digest-*.txt; do
+              [ "$(cat "$f")" = "$major" ] || echo "ODD: $(basename "$f" .txt) reports $(cat "$f")"
+            done
+            echo "FAIL: the guest is not deterministic across hosts ($distinct distinct digests)"
+            return 1
+          }
+          echo "=== per-host digests ==="
+          for f in digests/digest-*.txt; do echo "$(basename "$f" .txt): $(cat "$f")"; done
+          agree digests
+
+          # Control: one host's digest altered in a copy must fail, and that host must be named.
+          cp -r digests plant
+          odd=$(ls plant/digest-*.txt | head -1)
+          echo "DIGEST=0 STEPS=0 NQ=0" > "$odd"
+          if agree plant > plant.log; then
+            echo "FAIL: the comparison passed with one host's digest altered"
             exit 1
           fi
-          echo "PASS: identical physics digest on every platform"
+          grep -q "^ODD: $(basename "$odd" .txt) " plant.log || { echo "FAIL: the altered host was not named"; cat plant.log; exit 1; }
+
+          # Control: three hosts in agreement are not enough.
+          cp -r digests three
+          rm "$(ls three/digest-*.txt | head -1)"
+          if agree three > three.log; then
+            echo "FAIL: the comparison passed with three hosts"
+            exit 1
+          fi
+          echo "PASS: identical physics digest on four hosts; both controls fail"
