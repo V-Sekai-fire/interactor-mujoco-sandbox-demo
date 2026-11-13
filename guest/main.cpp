@@ -443,6 +443,32 @@ static Variant mjc_forward() {
 	return true;
 }
 
+static Variant mjc_nv() {
+	return g_model == nullptr ? 0 : (int)g_model->nv;
+}
+
+static Variant mjc_qacc() {
+	if (g_model == nullptr || g_data == nullptr) {
+		return PackedArray<double>(std::vector<double>());
+	}
+	const std::vector<double> a(g_data->qacc, g_data->qacc + g_model->nv);
+	return PackedArray<double>(a);
+}
+
+// Inverse dynamics at the set qpos and qvel. An empty reply means qacc was not nv long.
+static Variant mjc_inverse(PackedArray<double> qacc) {
+	const std::vector<double> a = qacc.fetch();
+	if (g_model == nullptr || g_data == nullptr || (int)a.size() != g_model->nv) {
+		return PackedArray<double>(std::vector<double>());
+	}
+	for (int k = 0; k < g_model->nv; k++) {
+		g_data->qacc[k] = a[k];
+	}
+	mj_inverse(g_model, g_data);
+	const std::vector<double> f(g_data->qfrc_inverse, g_data->qfrc_inverse + g_model->nv);
+	return PackedArray<double>(f);
+}
+
 static Variant mjc_mocap_set(int index, PackedArray<double> pose) {
 	const std::vector<double> p = pose.fetch();
 	if (g_model == nullptr || g_data == nullptr || index < 0 || index >= g_model->nmocap || p.size() != 7) {
@@ -514,6 +540,9 @@ int main() {
 	ADD_API_FUNCTION(mjc_set_qpos, "bool", "PackedFloat64Array qpos", "Set every generalised position");
 	ADD_API_FUNCTION(mjc_set_qvel, "bool", "PackedFloat64Array qvel", "Set every generalised velocity");
 	ADD_API_FUNCTION(mjc_forward, "bool", "", "Kinematics and collision without integrating");
+	ADD_API_FUNCTION(mjc_nv, "int", "", "Number of degrees of freedom");
+	ADD_API_FUNCTION(mjc_qacc, "PackedFloat64Array", "", "Generalised accelerations of the last forward pass");
+	ADD_API_FUNCTION(mjc_inverse, "PackedFloat64Array", "PackedFloat64Array qacc", "Inverse dynamics: generalised forces for qacc at the set qpos and qvel; empty if qacc is not nv long");
 	ADD_API_FUNCTION(mjc_mocap_set, "bool", "int index, PackedFloat64Array pose", "Place a mocap body at x,y,z,qw,qx,qy,qz");
 	ADD_API_FUNCTION(mjc_ray_group, "PackedFloat64Array", "PackedFloat64Array origin, PackedFloat64Array dir, float maxdist, int exclude_body, int group", "Nearest hit within one geom group (1 is walkable)");
 	ADD_API_FUNCTION(mjc_player_band, "bool", "float radius, float bottom, float top", "Make the next load's player a vertical cylinder over [bottom, top]");
